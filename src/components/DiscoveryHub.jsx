@@ -25,7 +25,7 @@ function MagicBookshelf({ query = 'children adventure' }) {
         setLoading(false)
       })
       .catch(() => {
-        setError('Could not load books. Check your connection.')
+        setError('Could not load books. Please try again later.')
         setLoading(false)
       })
   }, [query])
@@ -101,12 +101,12 @@ function DailyNews({ topic = 'children education' }) {
     fetch(url)
       .then(r => r.json())
       .then(data => {
-        if (data.status === 'error') throw new Error(data.message)
+        if (data.status === 'error') throw new Error('API error')
         setArticles((data.articles || []).slice(0, 4))
         setLoading(false)
       })
-      .catch(err => {
-        setError(err.message || 'Could not load news.')
+      .catch(() => {
+        setError('Could not load news. Please try again later.')
         setLoading(false)
       })
   }, [topic])

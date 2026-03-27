@@ -177,9 +177,9 @@ function StoryReader({ story }) {
 
   const handleClosePopover = useCallback(() => setActiveWord(null), [])
 
-  // Tokenise a paragraph into alternating word/non-word tokens
-  function tokenise(text) {
-    return text.split(/(\b[a-zA-Z''-]+\b)/g)
+  // Tokenize a paragraph into alternating word/non-word tokens
+  function tokenize(text) {
+    return text.split(/(\b[a-zA-Z'-]+\b)/g)
   }
 
   return (
@@ -216,7 +216,7 @@ function StoryReader({ story }) {
           {story.text.split('\n').map((para, i) =>
             para.trim() ? (
               <p key={i} className="mb-3">
-                {tokenise(para).map((token, j) => (
+                {tokenize(para).map((token, j) => (
                   <ClickableWord key={j} word={token} onSelect={handleWordSelect} />
                 ))}
               </p>
