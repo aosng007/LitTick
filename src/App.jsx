@@ -1,12 +1,13 @@
 /**
  * App.jsx
- * KoalaRead-15 – main application shell.
+ * LitTick – main application shell.
  * Manages story selection, active tab, and timer state.
  */
 import { useState, useEffect, useRef } from 'react'
 import Timer from './components/Timer'
 import Checklist from './components/Checklist'
 import PuzzleGame from './components/PuzzleGame'
+import Achievements from './components/Achievements'
 import stories from './content/Year2Texts.json'
 
 // ---------------------------------------------------------------------------
@@ -14,7 +15,7 @@ import stories from './content/Year2Texts.json'
 // ---------------------------------------------------------------------------
 function safeParseUnlocked() {
   try {
-    const raw = localStorage.getItem('koalaread-unlocked')
+    const raw = localStorage.getItem('littick_unlocked_stories')
     const parsed = JSON.parse(raw || '[]')
     return Array.isArray(parsed) ? parsed : []
   } catch {
@@ -150,6 +151,7 @@ export default function App() {
   const [selectedStory, setSelectedStory] = useState(null)
   const [activeTab, setActiveTab] = useState('read')
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
+  const [showAchievements, setShowAchievements] = useState(false)
   const puzzleTabTimeoutRef = useRef(null)
 
   // Clear the auto-switch timeout when the component unmounts
@@ -161,12 +163,12 @@ export default function App() {
   useEffect(() => {
     let saved = null
     try {
-      saved = localStorage.getItem('koalaread-story')
+      saved = localStorage.getItem('littick_selected_story')
     } catch (err) {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
       if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
         // Log in development so non-storage issues are visible
-        console.error('Failed to read koalaread-story from localStorage', err)
+        console.error('Failed to read littick_selected_story from localStorage', err)
       }
       return
     }
@@ -183,7 +185,7 @@ export default function App() {
   const handleSelectStory = (story) => {
     setSelectedStory(story)
     setActiveTab('read')
-    try { localStorage.setItem('koalaread-story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
+    try { localStorage.setItem('littick_selected_story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
     // Restore puzzle unlock state
     const ul = safeParseUnlocked()
     setPuzzleUnlocked(ul.includes(story.id))
@@ -195,7 +197,7 @@ export default function App() {
     const ul = safeParseUnlocked()
     if (!ul.includes(selectedStory.id)) {
       try {
-        localStorage.setItem('koalaread-unlocked', JSON.stringify([...ul, selectedStory.id]))
+        localStorage.setItem('littick_unlocked_stories', JSON.stringify([...ul, selectedStory.id]))
       } catch { /* localStorage unavailable – storage restriction */ }
     }
     // Auto-switch to puzzle tab after a short delay; store id so we can cancel it
@@ -208,7 +210,12 @@ export default function App() {
     setSelectedStory(null)
     setActiveTab('read')
     setPuzzleUnlocked(false)
-    try { localStorage.removeItem('koalaread-story') } catch { /* localStorage unavailable – storage restriction */ }
+    try { localStorage.removeItem('littick_selected_story') } catch { /* localStorage unavailable – storage restriction */ }
+  }
+
+  // ── Achievements screen ───────────────────────────────────────────────────
+  if (showAchievements) {
+    return <Achievements onBack={() => setShowAchievements(false)} />
   }
 
   // ── Story selection screen ────────────────────────────────────────────────
@@ -219,7 +226,7 @@ export default function App() {
         <div className="text-center mb-8">
           <div className="text-6xl mb-2">🐨</div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-koala-teal">
-            KoalaRead-15
+            LitTick
           </h1>
           <p className="text-gray-500 font-semibold mt-1">
             Your 15-Minute Reading Adventure!
@@ -233,7 +240,16 @@ export default function App() {
           ))}
         </div>
 
-        <p className="mt-8 text-xs text-gray-400 text-center max-w-xs">
+        {/* Achievements link */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="mt-6 flex items-center gap-2 rounded-2xl bg-yellow-400/80 px-5 py-2.5 font-bold text-yellow-900 shadow hover:bg-yellow-400 active:scale-95 transition-all"
+          aria-label="View my achievements"
+        >
+          🏆 My Achievements
+        </button>
+
+        <p className="mt-4 text-xs text-gray-400 text-center max-w-xs">
           Pick a story to start reading! ⭐ All stories are curriculum-aligned for Year 2 students.
         </p>
       </div>
@@ -256,11 +272,17 @@ export default function App() {
         <div className="flex items-center gap-2">
           <span className="text-2xl">🐨</span>
           <span className="font-extrabold text-koala-teal text-lg hidden sm:block">
-            KoalaRead-15
+            LitTick
           </span>
         </div>
 
-        <div className="w-24" aria-hidden="true" /> {/* spacer */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="flex items-center gap-1.5 rounded-2xl bg-yellow-400/70 px-3 py-2 text-sm font-bold text-yellow-900 shadow hover:bg-yellow-400 active:scale-95 transition-all"
+          aria-label="View my achievements"
+        >
+          🏆
+        </button>
       </header>
 
       {/* Main card */}
@@ -317,7 +339,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="mt-6 text-xs text-gray-400 text-center">
-        KoalaRead-15 🐨 · Made for Year 2 readers in Australia 🇦🇺
+        LitTick 🐨 · Made for Year 2 readers in Australia 🇦🇺
       </footer>
     </div>
   )

@@ -1,12 +1,56 @@
 /**
  * Timer.jsx
- * 15-minute countdown timer for KoalaRead-15.
+ * 15-minute countdown timer for LitTick.
  * Uses the Web Audio API to play a celebratory chime when time is up,
- * and shows a virtual star badge reward.
+ * shows a full-screen confetti effect, and awards a virtual badge.
+ * Timer state persists across page refreshes via littick_timer_state in LocalStorage.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 const TOTAL_SECONDS = 15 * 60 // 15 minutes
+const TIMER_STATE_KEY = 'littick_timer_state'
+const BADGES_KEY = 'littick_user_badges'
+
+// ---------------------------------------------------------------------------
+// Helper – safely read/write timer state from LocalStorage
+// ---------------------------------------------------------------------------
+function loadTimerState() {
+  try {
+    const raw = localStorage.getItem(TIMER_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object') return parsed
+    return null
+  } catch {
+    return null
+  }
+}
+
+function saveTimerState(state) {
+  try {
+    localStorage.setItem(TIMER_STATE_KEY, JSON.stringify(state))
+  } catch { /* localStorage unavailable – storage restriction */ }
+}
+
+function clearTimerState() {
+  try {
+    localStorage.removeItem(TIMER_STATE_KEY)
+  } catch { /* localStorage unavailable */ }
+}
+
+// ---------------------------------------------------------------------------
+// Helper – award a badge to the user's badge collection
+// ---------------------------------------------------------------------------
+function awardBadge(badgeId) {
+  try {
+    const raw = localStorage.getItem(BADGES_KEY)
+    const parsed = JSON.parse(raw || '[]')
+    const badges = Array.isArray(parsed) ? parsed : []
+    if (!badges.includes(badgeId)) {
+      localStorage.setItem(BADGES_KEY, JSON.stringify([...badges, badgeId]))
+    }
+  } catch { /* localStorage unavailable */ }
+}
 
 // ---------------------------------------------------------------------------
 // Helper – play a celebratory chime on an already-created AudioContext.
@@ -62,6 +106,44 @@ function playRewardChime(ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// Full-screen confetti overlay
+// ---------------------------------------------------------------------------
+const CONFETTI_EMOJIS = ['🎉', '⭐', '🌟', '🎊', '🏆', '🌈', '✨', '🎈']
+
+function ConfettiOverlay() {
+  const pieces = Array.from({ length: 32 }, (_, i) => ({
+    id: i,
+    emoji: CONFETTI_EMOJIS[i % CONFETTI_EMOJIS.length],
+    left: `${Math.random() * 100}%`,
+    animDuration: `${1.5 + Math.random() * 2}s`,
+    animDelay: `${Math.random() * 1.5}s`,
+    fontSize: `${1 + Math.random() * 1.5}rem`,
+  }))
+
+  return (
+    <div
+      className="fixed inset-0 z-40 pointer-events-none overflow-hidden"
+      aria-hidden="true"
+    >
+      {pieces.map(p => (
+        <span
+          key={p.id}
+          style={{
+            position: 'absolute',
+            top: '-2rem',
+            left: p.left,
+            fontSize: p.fontSize,
+            animation: `confettiFall ${p.animDuration} ${p.animDelay} ease-in forwards`,
+          }}
+        >
+          {p.emoji}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Reward badge overlay
 // ---------------------------------------------------------------------------
 function RewardBadge({ onDismiss }) {
@@ -106,12 +188,37 @@ function RewardBadge({ onDismiss }) {
 // Main Timer component
 // ---------------------------------------------------------------------------
 export default function Timer({ onTimerComplete }) {
-  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
-  const [isRunning, setIsRunning] = useState(false)
-  const [hasFinished, setHasFinished] = useState(false)
+  // Initialise from persisted state so the timer survives page refreshes
+  const [secondsLeft, setSecondsLeft] = useState(() => {
+    const saved = loadTimerState()
+    if (!saved) return TOTAL_SECONDS
+    if (saved.hasFinished) return 0
+    // If the timer was actively running, compute how much time has elapsed
+    // since we last saved, so we can restore accurately after a page refresh.
+    if (saved.isTimerActive && saved.startTimestamp) {
+      const elapsed = Math.floor((Date.now() - saved.startTimestamp) / 1000)
+      const remaining = Math.max(0, saved.secondsLeft - elapsed)
+      return remaining
+    }
+    return typeof saved.secondsLeft === 'number' ? saved.secondsLeft : TOTAL_SECONDS
+  })
+  const [isTimerActive, setIsTimerActive] = useState(() => {
+    const saved = loadTimerState()
+    // Resume running if the timer was active and hasn't finished
+    if (!saved) return false
+    if (saved.hasFinished) return false
+    return saved.isTimerActive === true
+  })
+  const [hasFinished, setHasFinished] = useState(() => {
+    const saved = loadTimerState()
+    return saved?.hasFinished === true
+  })
   const [showBadge, setShowBadge] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
+  // Track when the current active run started (for timestamp-based persistence)
+  const runStartRef = useRef(null)
 
   // Create (or reuse) an AudioContext during a user gesture so the browser
   // allows audio playback later when the timer fires.
@@ -141,17 +248,37 @@ export default function Timer({ onTimerComplete }) {
     : secondsLeft > 60  ? '#F59E0B'
     : '#EF4444'
 
+  // Persist timer state whenever relevant values change
+  useEffect(() => {
+    if (hasFinished) {
+      saveTimerState({ secondsLeft: 0, hasFinished: true, isTimerActive: false, startTimestamp: null })
+    } else {
+      saveTimerState({
+        secondsLeft,
+        hasFinished: false,
+        isTimerActive,
+        startTimestamp: isTimerActive ? (runStartRef.current ?? Date.now()) : null,
+      })
+    }
+  }, [secondsLeft, isTimerActive, hasFinished])
+
   // Tick
   useEffect(() => {
-    if (isRunning && !hasFinished) {
+    if (isTimerActive && !hasFinished) {
+      // Record when this run leg started (used for timestamp-based persistence)
+      if (!runStartRef.current) {
+        runStartRef.current = Date.now()
+      }
       intervalRef.current = setInterval(() => {
         setSecondsLeft(prev => {
           if (prev <= 1) {
             clearInterval(intervalRef.current)
-            setIsRunning(false)
+            setIsTimerActive(false)
             setHasFinished(true)
             setShowBadge(true)
+            setShowConfetti(true)
             playRewardChime(audioCtxRef.current)
+            awardBadge('reading_star')
             if (onTimerComplete) onTimerComplete()
             return 0
           }
@@ -159,19 +286,35 @@ export default function Timer({ onTimerComplete }) {
         })
       }, 1000)
     }
-    return () => clearInterval(intervalRef.current)
-  }, [isRunning, hasFinished, onTimerComplete])
+    return () => {
+      clearInterval(intervalRef.current)
+      if (!isTimerActive) runStartRef.current = null
+    }
+  }, [isTimerActive, hasFinished, onTimerComplete])
+
+  // Dismiss confetti after 4 seconds automatically
+  useEffect(() => {
+    if (!showConfetti) return
+    const t = setTimeout(() => setShowConfetti(false), 4000)
+    return () => clearTimeout(t)
+  }, [showConfetti])
 
   const handleStart = useCallback(() => {
     ensureAudioContext()
-    setIsRunning(true)
+    runStartRef.current = Date.now()
+    setIsTimerActive(true)
   }, [ensureAudioContext])
-  const handlePause = useCallback(() => setIsRunning(false), [])
+  const handlePause = useCallback(() => {
+    runStartRef.current = null
+    setIsTimerActive(false)
+  }, [])
   const handleReset = useCallback(() => {
     clearInterval(intervalRef.current)
-    setIsRunning(false)
+    runStartRef.current = null
+    setIsTimerActive(false)
     setHasFinished(false)
     setSecondsLeft(TOTAL_SECONDS)
+    clearTimerState()
     // Close any open AudioContext so it can be freshly created on next Start
     try { audioCtxRef.current?.close() } catch { /* ignore */ }
     audioCtxRef.current = null
@@ -184,6 +327,7 @@ export default function Timer({ onTimerComplete }) {
 
   return (
     <>
+      {showConfetti && <ConfettiOverlay />}
       {showBadge && (
         <RewardBadge onDismiss={() => setShowBadge(false)} />
       )}
@@ -222,14 +366,14 @@ export default function Timer({ onTimerComplete }) {
               {timeString}
             </span>
             <span className="text-xs text-gray-400 font-semibold mt-0.5">
-              {hasFinished ? 'Done! 🎉' : isRunning ? 'Reading…' : 'Ready?'}
+              {hasFinished ? 'Done! 🎉' : isTimerActive ? 'Reading…' : 'Ready?'}
             </span>
           </div>
         </div>
 
         {/* Control buttons */}
         <div className="flex gap-3 flex-wrap justify-center">
-          {!isRunning && !hasFinished && (
+          {!isTimerActive && !hasFinished && (
             <button
               onClick={handleStart}
               className="rounded-2xl bg-koala-green px-6 py-3 text-white font-bold text-base shadow-md hover:bg-koala-teal active:scale-95 transition-all"
@@ -238,7 +382,7 @@ export default function Timer({ onTimerComplete }) {
               ▶ Start
             </button>
           )}
-          {isRunning && (
+          {isTimerActive && (
             <button
               onClick={handlePause}
               className="rounded-2xl bg-amber-400 px-6 py-3 text-white font-bold text-base shadow-md hover:bg-amber-500 active:scale-95 transition-all"
@@ -247,7 +391,7 @@ export default function Timer({ onTimerComplete }) {
               ⏸ Pause
             </button>
           )}
-          {(!isRunning && secondsLeft < TOTAL_SECONDS) && (
+          {(!isTimerActive && secondsLeft < TOTAL_SECONDS) && (
             <>
               {!hasFinished && (
                 <button
@@ -279,7 +423,7 @@ export default function Timer({ onTimerComplete }) {
         </div>
 
         {/* Motivational message */}
-        {isRunning && (
+        {isTimerActive && (
           <p className="text-sm text-koala-teal font-semibold animate-pulse-slow text-center">
             📖 Great job reading! Keep going! 🌟
           </p>
