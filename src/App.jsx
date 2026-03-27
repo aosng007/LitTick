@@ -1,12 +1,13 @@
 /**
  * App.jsx
- * KoalaRead-15 – main application shell.
+ * LitTick – main application shell.
  * Manages story selection, active tab, and timer state.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import Timer from './components/Timer'
 import Checklist from './components/Checklist'
 import PuzzleGame from './components/PuzzleGame'
+import DiscoveryHub from './components/DiscoveryHub'
 import stories from './content/Year2Texts.json'
 
 // ---------------------------------------------------------------------------
@@ -14,12 +15,237 @@ import stories from './content/Year2Texts.json'
 // ---------------------------------------------------------------------------
 function safeParseUnlocked() {
   try {
-    const raw = localStorage.getItem('koalaread-unlocked')
+    const raw = localStorage.getItem('littick_unlocked_stories')
     const parsed = JSON.parse(raw || '[]')
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
+}
+
+// ---------------------------------------------------------------------------
+// Unsplash background helper
+// ---------------------------------------------------------------------------
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || ''
+
+function useStoryBackground(theme) {
+  const [bgUrl, setBgUrl] = useState(null)
+
+  useEffect(() => {
+    if (!theme) { setBgUrl(null); return }
+    if (!UNSPLASH_ACCESS_KEY) { setBgUrl(null); return }
+
+    const url = `https://api.unsplash.com/photos/random?query=${encodeURIComponent(theme)}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.urls && data.urls.regular) {
+          setBgUrl(data.urls.regular)
+        }
+      })
+      .catch(() => setBgUrl(null))
+  }, [theme])
+
+  return bgUrl
+}
+
+// ---------------------------------------------------------------------------
+// Dictionary API word popover
+// ---------------------------------------------------------------------------
+function DictionaryPopover({ word, onClose }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const popoverRef = useRef(null)
+
+  useEffect(() => {
+    const clean = word.replace(/[^a-zA-Z'-]/g, '').toLowerCase()
+    if (!clean) { setLoading(false); setError('No definition found.'); return }
+
+    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`)
+      .then(r => r.json())
+      .then(json => {
+        if (Array.isArray(json) && json.length > 0) {
+          setData(json[0])
+        } else {
+          setError('No definition found.')
+        }
+        setLoading(false)
+      })
+      .catch(() => {
+        setError('Could not load definition.')
+        setLoading(false)
+      })
+  }, [word])
+
+  // Close on outside click
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        onClose()
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [onClose])
+
+  const firstMeaning = data?.meanings?.[0]
+  const firstDefinition = firstMeaning?.definitions?.[0]?.definition
+  const partOfSpeech = firstMeaning?.partOfSpeech
+  const phonetic = data?.phonetic || data?.phonetics?.find(p => p.text)?.text
+  const audioUrl = data?.phonetics?.find(p => p.audio)?.audio
+
+  return (
+    <div
+      ref={popoverRef}
+      className="fixed inset-x-4 bottom-4 z-50 sm:absolute sm:inset-x-auto sm:bottom-auto sm:top-full sm:left-0 sm:mt-1 sm:w-72 rounded-2xl bg-white shadow-2xl border border-koala-green/30 p-4 text-sm"
+      role="dialog"
+      aria-label={`Definition of ${word}`}
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div>
+          <span className="font-extrabold text-koala-teal text-base">{word}</span>
+          {phonetic && (
+            <span className="ml-2 text-gray-400 text-xs">{phonetic}</span>
+          )}
+          {partOfSpeech && (
+            <span className="ml-2 text-xs italic text-gray-400">{partOfSpeech}</span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center text-xs font-bold active:scale-90"
+          aria-label="Close definition"
+        >
+          ✕
+        </button>
+      </div>
+
+      {loading && (
+        <p className="text-gray-400 animate-pulse">Looking up definition…</p>
+      )}
+      {error && (
+        <p className="text-gray-400 italic">{error}</p>
+      )}
+      {!loading && !error && firstDefinition && (
+        <p className="text-gray-700 leading-relaxed">{firstDefinition}</p>
+      )}
+
+      {audioUrl && (
+        <button
+          onClick={() => { try { new Audio(audioUrl).play() } catch { /* audio unsupported */ } }}
+          className="mt-2 flex items-center gap-1 text-xs text-koala-teal hover:text-koala-green font-semibold"
+          aria-label={`Listen to pronunciation of ${word}`}
+        >
+          🔊 Hear it
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Clickable word span
+// ---------------------------------------------------------------------------
+function ClickableWord({ word, onSelect }) {
+  // Only make alphabetic words clickable (skip numbers, punctuation-only tokens)
+  const isWord = /[a-zA-Z]/.test(word)
+  if (!isWord) return <>{word}</>
+  return (
+    <span
+      className="cursor-pointer hover:bg-koala-yellow/40 hover:rounded px-0.5 transition-colors"
+      onClick={() => onSelect(word)}
+      title="Click for definition"
+    >
+      {word}
+    </span>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Reading view – story text with font-size control + dictionary popovers
+// ---------------------------------------------------------------------------
+function StoryReader({ story }) {
+  const [fontSize, setFontSize] = useState(18)
+  const [activeWord, setActiveWord] = useState(null)
+
+  const handleWordSelect = useCallback((word) => {
+    const clean = word.replace(/[^a-zA-Z'-]/g, '')
+    if (clean.length < 2) return
+    setActiveWord(clean)
+  }, [])
+
+  const handleClosePopover = useCallback(() => setActiveWord(null), [])
+
+  // Tokenise a paragraph into alternating word/non-word tokens
+  function tokenise(text) {
+    return text.split(/(\b[a-zA-Z''-]+\b)/g)
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-extrabold text-koala-teal text-xl flex items-center gap-2">
+          {story.emoji} {story.title}
+        </h2>
+        <div className="flex gap-1 items-center">
+          <button
+            onClick={() => setFontSize(s => Math.max(14, s - 2))}
+            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-sm active:scale-90 transition-all"
+            aria-label="Decrease font size"
+          >A−</button>
+          <button
+            onClick={() => setFontSize(s => Math.min(28, s + 2))}
+            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 active:scale-90 transition-all"
+            aria-label="Increase font size"
+          >A+</button>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400 italic">
+        💡 Tap any word to see its definition!
+      </p>
+
+      <div className="relative">
+        <div
+          className="rounded-2xl bg-koala-cream/80 border border-yellow-200 p-4 leading-relaxed text-gray-700 max-h-[45vh] overflow-y-auto"
+          style={{ fontSize: `${fontSize}px` }}
+          role="article"
+          aria-label={`Story text: ${story.title}`}
+        >
+          {story.text.split('\n').map((para, i) =>
+            para.trim() ? (
+              <p key={i} className="mb-3">
+                {tokenise(para).map((token, j) => (
+                  <ClickableWord key={j} word={token} onSelect={handleWordSelect} />
+                ))}
+              </p>
+            ) : null
+          )}
+        </div>
+
+        {/* Dictionary popover */}
+        {activeWord && (
+          <DictionaryPopover
+            word={activeWord}
+            onClose={handleClosePopover}
+          />
+        )}
+      </div>
+
+      {/* Comprehension questions */}
+      <details className="rounded-2xl border border-koala-green/30 bg-white/70 p-3">
+        <summary className="font-bold text-koala-teal cursor-pointer text-sm">
+          💬 Comprehension Questions
+        </summary>
+        <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-gray-700">
+          {story.questions.map((q, i) => (
+            <li key={i}>{q}</li>
+          ))}
+        </ol>
+      </details>
+    </div>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -52,64 +278,14 @@ function StoryCard({ story, onSelect }) {
 }
 
 // ---------------------------------------------------------------------------
-// Reading view – story text with font-size control
-// ---------------------------------------------------------------------------
-function StoryReader({ story }) {
-  const [fontSize, setFontSize] = useState(18)
-
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="font-extrabold text-koala-teal text-xl flex items-center gap-2">
-          {story.emoji} {story.title}
-        </h2>
-        <div className="flex gap-1 items-center">
-          <button
-            onClick={() => setFontSize(s => Math.max(14, s - 2))}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 text-sm active:scale-90 transition-all"
-            aria-label="Decrease font size"
-          >A−</button>
-          <button
-            onClick={() => setFontSize(s => Math.min(28, s + 2))}
-            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 font-bold text-gray-600 active:scale-90 transition-all"
-            aria-label="Increase font size"
-          >A+</button>
-        </div>
-      </div>
-      <div
-        className="rounded-2xl bg-koala-cream/80 border border-yellow-200 p-4 leading-relaxed text-gray-700 max-h-[45vh] overflow-y-auto"
-        style={{ fontSize: `${fontSize}px` }}
-        role="article"
-        aria-label={`Story text: ${story.title}`}
-      >
-        {story.text.split('\n').map((para, i) =>
-          para.trim() ? <p key={i} className="mb-3">{para}</p> : null
-        )}
-      </div>
-
-      {/* Comprehension questions */}
-      <details className="rounded-2xl border border-koala-green/30 bg-white/70 p-3">
-        <summary className="font-bold text-koala-teal cursor-pointer text-sm">
-          💬 Comprehension Questions
-        </summary>
-        <ol className="mt-2 list-decimal list-inside space-y-1 text-sm text-gray-700">
-          {story.questions.map((q, i) => (
-            <li key={i}>{q}</li>
-          ))}
-        </ol>
-      </details>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Tab bar
 // ---------------------------------------------------------------------------
 const TABS = [
-  { id: 'read',    label: 'Read',     emoji: '📖' },
-  { id: 'timer',   label: 'Timer',    emoji: '⏱' },
-  { id: 'retell',  label: 'Retell',   emoji: '🖐' },
-  { id: 'puzzle',  label: 'Puzzle',   emoji: '🔍' },
+  { id: 'read',      label: 'Read',      emoji: '📖' },
+  { id: 'timer',     label: 'Timer',     emoji: '⏱' },
+  { id: 'retell',    label: 'Retell',    emoji: '🖐' },
+  { id: 'puzzle',    label: 'Puzzle',    emoji: '🔍' },
+  { id: 'discover',  label: 'Discover',  emoji: '🔭' },
 ]
 
 function TabBar({ active, onChange, puzzleLocked }) {
@@ -152,6 +328,9 @@ export default function App() {
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
   const puzzleTabTimeoutRef = useRef(null)
 
+  // Fetch Unsplash background based on current story theme
+  const bgUrl = useStoryBackground(selectedStory?.theme || null)
+
   // Clear the auto-switch timeout when the component unmounts
   useEffect(() => {
     return () => clearTimeout(puzzleTabTimeoutRef.current)
@@ -161,12 +340,12 @@ export default function App() {
   useEffect(() => {
     let saved = null
     try {
-      saved = localStorage.getItem('koalaread-story')
+      saved = localStorage.getItem('littick_selected_story')
     } catch (err) {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
       if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
         // Log in development so non-storage issues are visible
-        console.error('Failed to read koalaread-story from localStorage', err)
+        console.error('Failed to read littick_selected_story from localStorage', err)
       }
       return
     }
@@ -183,7 +362,7 @@ export default function App() {
   const handleSelectStory = (story) => {
     setSelectedStory(story)
     setActiveTab('read')
-    try { localStorage.setItem('koalaread-story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
+    try { localStorage.setItem('littick_selected_story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
     // Restore puzzle unlock state
     const ul = safeParseUnlocked()
     setPuzzleUnlocked(ul.includes(story.id))
@@ -195,7 +374,7 @@ export default function App() {
     const ul = safeParseUnlocked()
     if (!ul.includes(selectedStory.id)) {
       try {
-        localStorage.setItem('koalaread-unlocked', JSON.stringify([...ul, selectedStory.id]))
+        localStorage.setItem('littick_unlocked_stories', JSON.stringify([...ul, selectedStory.id]))
       } catch { /* localStorage unavailable – storage restriction */ }
     }
     // Auto-switch to puzzle tab after a short delay; store id so we can cancel it
@@ -208,18 +387,18 @@ export default function App() {
     setSelectedStory(null)
     setActiveTab('read')
     setPuzzleUnlocked(false)
-    try { localStorage.removeItem('koalaread-story') } catch { /* localStorage unavailable – storage restriction */ }
+    try { localStorage.removeItem('littick_selected_story') } catch { /* localStorage unavailable – storage restriction */ }
   }
 
   // ── Story selection screen ────────────────────────────────────────────────
   if (!selectedStory) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      <div className="min-h-screen flex flex-col items-center px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="text-6xl mb-2">🐨</div>
+          <div className="text-6xl mb-2">📚</div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-koala-teal">
-            KoalaRead-15
+            LitTick
           </h1>
           <p className="text-gray-500 font-semibold mt-1">
             Your 15-Minute Reading Adventure!
@@ -236,13 +415,36 @@ export default function App() {
         <p className="mt-8 text-xs text-gray-400 text-center max-w-xs">
           Pick a story to start reading! ⭐ All stories are curriculum-aligned for Year 2 students.
         </p>
+
+        {/* Discovery Hub on home screen */}
+        <div className="w-full max-w-2xl mt-10">
+          <DiscoveryHub storyTheme="children adventure animals" />
+        </div>
       </div>
     )
   }
 
   // ── Main reading interface ────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col items-center px-3 py-4 sm:px-6 sm:py-6">
+    <div className="min-h-screen flex flex-col items-center px-3 py-4 sm:px-6 sm:py-6 relative">
+      {/* Unsplash background image with backdrop-blur */}
+      {bgUrl ? (
+        <div
+          className="fixed inset-0 -z-10 bg-cover bg-center scale-105"
+          style={{
+            backgroundImage: `url(${bgUrl})`,
+            filter: 'blur(6px) brightness(0.55)',
+          }}
+          aria-hidden="true"
+        />
+      ) : (
+        <div
+          className="fixed inset-0 -z-10"
+          style={{ background: `linear-gradient(135deg, ${selectedStory.coverColor}22 0%, #f0fdf4 100%)` }}
+          aria-hidden="true"
+        />
+      )}
+
       {/* App header */}
       <header className="w-full max-w-2xl flex items-center justify-between mb-4">
         <button
@@ -254,9 +456,9 @@ export default function App() {
         </button>
 
         <div className="flex items-center gap-2">
-          <span className="text-2xl">🐨</span>
+          <span className="text-2xl">📚</span>
           <span className="font-extrabold text-koala-teal text-lg hidden sm:block">
-            KoalaRead-15
+            LitTick
           </span>
         </div>
 
@@ -312,13 +514,19 @@ export default function App() {
               storyTitle={selectedStory.title}
             />
           )}
+
+          {activeTab === 'discover' && (
+            <DiscoveryHub storyTheme={selectedStory.theme} />
+          )}
         </div>
       </main>
 
       {/* Footer */}
       <footer className="mt-6 text-xs text-gray-400 text-center">
-        KoalaRead-15 🐨 · Made for Year 2 readers in Australia 🇦🇺
+        LitTick 📚 · Made for Year 2 readers in Australia 🇦🇺
       </footer>
     </div>
   )
 }
+
+

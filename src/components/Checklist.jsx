@@ -59,7 +59,7 @@ const FINGERS = [
 ]
 
 function storageKey(storyId) {
-  return `koalaread-checklist-${storyId}`
+  return `littick_checklist_${storyId}`
 }
 
 export default function Checklist({ storyId }) {
