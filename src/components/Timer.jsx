@@ -9,47 +9,53 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 const TOTAL_SECONDS = 15 * 60 // 15 minutes
 
 // ---------------------------------------------------------------------------
-// Helper – build a celebratory chime using Web Audio API (no file needed)
+// Helper – play a celebratory chime on an already-created AudioContext.
+// Passing the context in (rather than creating a new one here) guarantees
+// it was initialised during a user gesture and won't be blocked by browsers.
+// The context is closed automatically once playback finishes (~2.5 s).
 // ---------------------------------------------------------------------------
-function playRewardChime() {
+function playRewardChime(ctx) {
+  if (!ctx || ctx.state === 'closed') return
   try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext
-    if (!AudioCtx) return
-    const ctx = new AudioCtx()
-
-    // Notes: C5 – E5 – G5 – C6 (major arpeggio)
-    const notes = [523.25, 659.25, 783.99, 1046.5]
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18)
-      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18)
-      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + i * 0.18 + 0.05)
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5)
-      osc.start(ctx.currentTime + i * 0.18)
-      osc.stop(ctx.currentTime + i * 0.18 + 0.6)
-    })
-
-    // A second sparkly burst after the arpeggio
-    setTimeout(() => {
-      const notes2 = [1046.5, 1318.5, 1567.98]
-      notes2.forEach((freq, i) => {
+    const resume = ctx.state === 'suspended' ? ctx.resume() : Promise.resolve()
+    resume.then(() => {
+      // Notes: C5 – E5 – G5 – C6 (major arpeggio)
+      const notes = [523.25, 659.25, 783.99, 1046.5]
+      notes.forEach((freq, i) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
         osc.connect(gain)
         gain.connect(ctx.destination)
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1)
-        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1)
-        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.1 + 0.04)
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4)
-        osc.start(ctx.currentTime + i * 0.1)
-        osc.stop(ctx.currentTime + i * 0.1 + 0.5)
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18)
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18)
+        gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + i * 0.18 + 0.05)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5)
+        osc.start(ctx.currentTime + i * 0.18)
+        osc.stop(ctx.currentTime + i * 0.18 + 0.6)
       })
-    }, 800)
+
+      // A second sparkly burst after the arpeggio
+      setTimeout(() => {
+        if (ctx.state === 'closed') return
+        const notes2 = [1046.5, 1318.5, 1567.98]
+        notes2.forEach((freq, i) => {
+          const osc = ctx.createOscillator()
+          const gain = ctx.createGain()
+          osc.connect(gain)
+          gain.connect(ctx.destination)
+          osc.type = 'triangle'
+          osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1)
+          gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1)
+          gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.1 + 0.04)
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4)
+          osc.start(ctx.currentTime + i * 0.1)
+          osc.stop(ctx.currentTime + i * 0.1 + 0.5)
+        })
+        // Close the context after all audio finishes to free resources
+        setTimeout(() => { try { ctx.close() } catch { /* ignore */ } }, 1500)
+      }, 800)
+    }).catch(() => { /* audio blocked – fail silently */ })
   } catch {
     // Audio not supported – fail silently
   }
@@ -105,6 +111,21 @@ export default function Timer({ onTimerComplete }) {
   const [hasFinished, setHasFinished] = useState(false)
   const [showBadge, setShowBadge] = useState(false)
   const intervalRef = useRef(null)
+  const audioCtxRef = useRef(null)
+
+  // Create (or reuse) an AudioContext during a user gesture so the browser
+  // allows audio playback later when the timer fires.
+  const ensureAudioContext = useCallback(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext
+      if (!AudioCtx) return
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new AudioCtx()
+      } else if (audioCtxRef.current.state === 'suspended') {
+        audioCtxRef.current.resume()
+      }
+    } catch { /* unsupported – fail silently */ }
+  }, [])
 
   // Format mm:ss
   const minutes = Math.floor(secondsLeft / 60)
@@ -114,7 +135,7 @@ export default function Timer({ onTimerComplete }) {
   // Progress percentage (0 → 100 as time elapses)
   const progress = ((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100
 
-  // Colour of the ring: green → amber → red in last 60 s
+  // Colour of the ring: green → amber in the last 2 min (≤ 120 s) → red in the last 1 min (≤ 60 s)
   const ringColour =
     secondsLeft > 120 ? '#5BAD8F'
     : secondsLeft > 60  ? '#F59E0B'
@@ -130,7 +151,7 @@ export default function Timer({ onTimerComplete }) {
             setIsRunning(false)
             setHasFinished(true)
             setShowBadge(true)
-            playRewardChime()
+            playRewardChime(audioCtxRef.current)
             if (onTimerComplete) onTimerComplete()
             return 0
           }
@@ -141,13 +162,19 @@ export default function Timer({ onTimerComplete }) {
     return () => clearInterval(intervalRef.current)
   }, [isRunning, hasFinished, onTimerComplete])
 
-  const handleStart = useCallback(() => setIsRunning(true), [])
+  const handleStart = useCallback(() => {
+    ensureAudioContext()
+    setIsRunning(true)
+  }, [ensureAudioContext])
   const handlePause = useCallback(() => setIsRunning(false), [])
   const handleReset = useCallback(() => {
     clearInterval(intervalRef.current)
     setIsRunning(false)
     setHasFinished(false)
     setSecondsLeft(TOTAL_SECONDS)
+    // Close any open AudioContext so it can be freshly created on next Start
+    try { audioCtxRef.current?.close() } catch { /* ignore */ }
+    audioCtxRef.current = null
   }, [])
 
   // SVG ring params

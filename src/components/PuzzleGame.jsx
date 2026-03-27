@@ -239,8 +239,13 @@ export default function PuzzleGame({ keywords = [], storyTitle = '' }) {
     const touch = e.changedTouches[0]
     const el = document.elementFromPoint(touch.clientX, touch.clientY)
     if (!el) return null
-    const r = el.getAttribute('data-row')
-    const c = el.getAttribute('data-col')
+    // elementFromPoint may return the inner <button> (Cell); find the nearest cell wrapper
+    const cellEl = typeof el.closest === 'function'
+      ? el.closest('[data-row][data-col]')
+      : el
+    if (!cellEl) return null
+    const r = cellEl.getAttribute('data-row')
+    const c = cellEl.getAttribute('data-col')
     if (r == null || c == null) return null
     return [parseInt(r), parseInt(c)]
   }, [])

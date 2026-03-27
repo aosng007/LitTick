@@ -3,11 +3,24 @@
  * KoalaRead-15 – main application shell.
  * Manages story selection, active tab, and timer state.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Timer from './components/Timer'
 import Checklist from './components/Checklist'
 import PuzzleGame from './components/PuzzleGame'
 import stories from './content/Year2Texts.json'
+
+// ---------------------------------------------------------------------------
+// Helper – safely parse the unlocked-stories array from localStorage
+// ---------------------------------------------------------------------------
+function safeParseUnlocked() {
+  try {
+    const raw = localStorage.getItem('koalaread-unlocked')
+    const parsed = JSON.parse(raw || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Story card for selection screen
@@ -16,7 +29,7 @@ function StoryCard({ story, onSelect }) {
   return (
     <button
       onClick={() => onSelect(story)}
-      className="group flex flex-col items-center gap-3 rounded-3xl border-2 border-transparent bg-white/80 p-5 shadow-md hover:shadow-xl hover:border-koala-green/50 active:scale-98 transition-all text-left w-full"
+      className="group flex flex-col items-center gap-3 rounded-3xl border-2 border-transparent bg-white/80 p-5 shadow-md hover:shadow-xl hover:border-koala-green/50 active:scale-[0.98] transition-all text-left w-full"
       aria-label={`Select story: ${story.title}`}
     >
       <div
@@ -137,6 +150,12 @@ export default function App() {
   const [selectedStory, setSelectedStory] = useState(null)
   const [activeTab, setActiveTab] = useState('read')
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
+  const puzzleTabTimeoutRef = useRef(null)
+
+  // Clear the auto-switch timeout when the component unmounts
+  useEffect(() => {
+    return () => clearTimeout(puzzleTabTimeoutRef.current)
+  }, [])
 
   // Persist story selection
   useEffect(() => {
@@ -146,7 +165,7 @@ export default function App() {
       if (found) setSelectedStory(found)
     }
     // Check if puzzle was previously unlocked for this story
-    const ul = JSON.parse(localStorage.getItem('koalaread-unlocked') || '[]')
+    const ul = safeParseUnlocked()
     if (saved && ul.includes(saved)) setPuzzleUnlocked(true)
   }, [])
 
@@ -155,22 +174,24 @@ export default function App() {
     setActiveTab('read')
     localStorage.setItem('koalaread-story', story.id)
     // Restore puzzle unlock state
-    const ul = JSON.parse(localStorage.getItem('koalaread-unlocked') || '[]')
+    const ul = safeParseUnlocked()
     setPuzzleUnlocked(ul.includes(story.id))
   }
 
   const handleTimerComplete = () => {
     if (!selectedStory) return
     setPuzzleUnlocked(true)
-    const ul = JSON.parse(localStorage.getItem('koalaread-unlocked') || '[]')
+    const ul = safeParseUnlocked()
     if (!ul.includes(selectedStory.id)) {
       localStorage.setItem('koalaread-unlocked', JSON.stringify([...ul, selectedStory.id]))
     }
-    // Auto-switch to puzzle tab after a short delay
-    setTimeout(() => setActiveTab('puzzle'), 1200)
+    // Auto-switch to puzzle tab after a short delay; store id so we can cancel it
+    puzzleTabTimeoutRef.current = setTimeout(() => setActiveTab('puzzle'), 1200)
   }
 
   const handleBackToMenu = () => {
+    // Cancel any pending auto-switch before unmounting the reading interface
+    clearTimeout(puzzleTabTimeoutRef.current)
     setSelectedStory(null)
     setActiveTab('read')
     setPuzzleUnlocked(false)
