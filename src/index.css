@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Open Sans', 'Comic Sans MS', cursive, sans-serif;
+    background: linear-gradient(135deg, #e0f7f0 0%, #d4eaf7 50%, #fdf3f0 100%);
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .animate-bounce-slow {
+    animation: bounce 2s infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s infinite;
+  }
+
+  .badge-shine {
+    background: linear-gradient(135deg, #ffd700, #ffec80, #ffd700);
+    background-size: 200% 200%;
+    animation: shine 2s linear infinite;
+  }
+}
+
+@keyframes shine {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

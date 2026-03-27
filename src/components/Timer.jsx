@@ -1,0 +1,263 @@
+/**
+ * Timer.jsx
+ * 15-minute countdown timer for KoalaRead-15.
+ * Uses the Web Audio API to play a celebratory chime when time is up,
+ * and shows a virtual star badge reward.
+ */
+import { useState, useEffect, useRef, useCallback } from 'react'
+
+const TOTAL_SECONDS = 15 * 60 // 15 minutes
+
+// ---------------------------------------------------------------------------
+// Helper – build a celebratory chime using Web Audio API (no file needed)
+// ---------------------------------------------------------------------------
+function playRewardChime() {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+    const ctx = new AudioCtx()
+
+    // Notes: C5 – E5 – G5 – C6 (major arpeggio)
+    const notes = [523.25, 659.25, 783.99, 1046.5]
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.18)
+      gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.18)
+      gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + i * 0.18 + 0.05)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.18 + 0.5)
+      osc.start(ctx.currentTime + i * 0.18)
+      osc.stop(ctx.currentTime + i * 0.18 + 0.6)
+    })
+
+    // A second sparkly burst after the arpeggio
+    setTimeout(() => {
+      const notes2 = [1046.5, 1318.5, 1567.98]
+      notes2.forEach((freq, i) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.1)
+        gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.1)
+        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.1 + 0.04)
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.4)
+        osc.start(ctx.currentTime + i * 0.1)
+        osc.stop(ctx.currentTime + i * 0.1 + 0.5)
+      })
+    }, 800)
+  } catch {
+    // Audio not supported – fail silently
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reward badge overlay
+// ---------------------------------------------------------------------------
+function RewardBadge({ onDismiss }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Reading complete reward"
+    >
+      <div className="relative flex flex-col items-center gap-4 rounded-3xl bg-white px-10 py-10 shadow-2xl text-center max-w-sm mx-4">
+        {/* Confetti-style emoji ring */}
+        <div className="text-5xl animate-bounce">🎉</div>
+        <div className="badge-shine w-32 h-32 rounded-full flex items-center justify-center text-6xl shadow-lg border-4 border-yellow-300">
+          ⭐
+        </div>
+        <h2 className="text-2xl font-extrabold text-koala-teal">
+          Amazing Reading! 🐨
+        </h2>
+        <p className="text-lg text-gray-600 font-semibold">
+          You read for 15 whole minutes!<br />You earned a Reading Star! 🌟
+        </p>
+        <div className="flex gap-2 text-2xl">
+          {['🦘', '🐨', '🦎', '🦜', '🌺'].map((e, i) => (
+            <span key={i} className="animate-bounce" style={{ animationDelay: `${i * 0.15}s` }}>
+              {e}
+            </span>
+          ))}
+        </div>
+        <button
+          onClick={onDismiss}
+          className="mt-2 rounded-2xl bg-koala-green px-8 py-3 text-white font-bold text-lg shadow-md hover:bg-koala-teal active:scale-95 transition-all"
+        >
+          Keep Going! 🚀
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main Timer component
+// ---------------------------------------------------------------------------
+export default function Timer({ onTimerComplete }) {
+  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
+  const [isRunning, setIsRunning] = useState(false)
+  const [hasFinished, setHasFinished] = useState(false)
+  const [showBadge, setShowBadge] = useState(false)
+  const intervalRef = useRef(null)
+
+  // Format mm:ss
+  const minutes = Math.floor(secondsLeft / 60)
+  const seconds = secondsLeft % 60
+  const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+
+  // Progress percentage (0 → 100 as time elapses)
+  const progress = ((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100
+
+  // Colour of the ring: green → amber → red in last 60 s
+  const ringColour =
+    secondsLeft > 120 ? '#5BAD8F'
+    : secondsLeft > 60  ? '#F59E0B'
+    : '#EF4444'
+
+  // Tick
+  useEffect(() => {
+    if (isRunning && !hasFinished) {
+      intervalRef.current = setInterval(() => {
+        setSecondsLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(intervalRef.current)
+            setIsRunning(false)
+            setHasFinished(true)
+            setShowBadge(true)
+            playRewardChime()
+            if (onTimerComplete) onTimerComplete()
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => clearInterval(intervalRef.current)
+  }, [isRunning, hasFinished, onTimerComplete])
+
+  const handleStart = useCallback(() => setIsRunning(true), [])
+  const handlePause = useCallback(() => setIsRunning(false), [])
+  const handleReset = useCallback(() => {
+    clearInterval(intervalRef.current)
+    setIsRunning(false)
+    setHasFinished(false)
+    setSecondsLeft(TOTAL_SECONDS)
+  }, [])
+
+  // SVG ring params
+  const r = 54
+  const circumference = 2 * Math.PI * r
+  const strokeDashoffset = circumference - (progress / 100) * circumference
+
+  return (
+    <>
+      {showBadge && (
+        <RewardBadge onDismiss={() => setShowBadge(false)} />
+      )}
+
+      <div className="flex flex-col items-center gap-4">
+        {/* Circular progress ring */}
+        <div className="relative w-36 h-36 sm:w-44 sm:h-44" aria-hidden="true">
+          <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+            {/* Track */}
+            <circle
+              cx="60" cy="60" r={r}
+              fill="none"
+              stroke="#E5E7EB"
+              strokeWidth="8"
+            />
+            {/* Progress arc */}
+            <circle
+              cx="60" cy="60" r={r}
+              fill="none"
+              stroke={ringColour}
+              strokeWidth="8"
+              strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              style={{ transition: 'stroke-dashoffset 0.8s ease, stroke 0.6s ease' }}
+            />
+          </svg>
+          {/* Time display in centre */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span
+              className="text-2xl sm:text-3xl font-extrabold tabular-nums"
+              style={{ color: ringColour }}
+              aria-live="polite"
+              aria-label={`${minutes} minutes and ${seconds} seconds remaining`}
+            >
+              {timeString}
+            </span>
+            <span className="text-xs text-gray-400 font-semibold mt-0.5">
+              {hasFinished ? 'Done! 🎉' : isRunning ? 'Reading…' : 'Ready?'}
+            </span>
+          </div>
+        </div>
+
+        {/* Control buttons */}
+        <div className="flex gap-3 flex-wrap justify-center">
+          {!isRunning && !hasFinished && (
+            <button
+              onClick={handleStart}
+              className="rounded-2xl bg-koala-green px-6 py-3 text-white font-bold text-base shadow-md hover:bg-koala-teal active:scale-95 transition-all"
+              aria-label="Start reading timer"
+            >
+              ▶ Start
+            </button>
+          )}
+          {isRunning && (
+            <button
+              onClick={handlePause}
+              className="rounded-2xl bg-amber-400 px-6 py-3 text-white font-bold text-base shadow-md hover:bg-amber-500 active:scale-95 transition-all"
+              aria-label="Pause reading timer"
+            >
+              ⏸ Pause
+            </button>
+          )}
+          {(!isRunning && secondsLeft < TOTAL_SECONDS) && (
+            <>
+              {!hasFinished && (
+                <button
+                  onClick={handleStart}
+                  className="rounded-2xl bg-koala-blue px-6 py-3 text-white font-bold text-base shadow-md hover:bg-blue-600 active:scale-95 transition-all"
+                  aria-label="Resume reading timer"
+                >
+                  ▶ Resume
+                </button>
+              )}
+              <button
+                onClick={handleReset}
+                className="rounded-2xl bg-gray-200 px-6 py-3 text-gray-700 font-bold text-base shadow-md hover:bg-gray-300 active:scale-95 transition-all"
+                aria-label="Reset reading timer"
+              >
+                ↺ Reset
+              </button>
+            </>
+          )}
+          {hasFinished && (
+            <button
+              onClick={handleReset}
+              className="rounded-2xl bg-purple-500 px-6 py-3 text-white font-bold text-base shadow-md hover:bg-purple-600 active:scale-95 transition-all"
+              aria-label="Start a new reading session"
+            >
+              🔄 New Session
+            </button>
+          )}
+        </div>
+
+        {/* Motivational message */}
+        {isRunning && (
+          <p className="text-sm text-koala-teal font-semibold animate-pulse-slow text-center">
+            📖 Great job reading! Keep going! 🌟
+          </p>
+        )}
+      </div>
+    </>
+  )
+}
