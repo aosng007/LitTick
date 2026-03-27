@@ -176,7 +176,7 @@ export default function App() {
       if (found) setSelectedStory(found)
     }
     // Check if puzzle was previously unlocked for this story
-   const ul = safeParseUnlocked()
+    const ul = safeParseUnlocked()
     if (saved && ul.includes(saved)) setPuzzleUnlocked(true)
   }, [])
 
