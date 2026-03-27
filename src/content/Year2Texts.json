@@ -1,0 +1,50 @@
+[
+  {
+    "id": "koala-1",
+    "title": "Kip the Koala's Big Climb",
+    "theme": "Australian Animals",
+    "emoji": "🐨",
+    "coverColor": "#5BAD8F",
+    "keywords": ["koala", "gumtree", "climb", "joey", "forest"],
+    "text": "Deep in the Australian forest lived a little koala named Kip. Kip had soft grey fur, a big black nose, and round fluffy ears. Every morning, Kip would wake up high in his favourite gumtree and munch on the juicy green leaves.\n\nOne sunny day, Kip's mum said, \"It is time to learn to climb higher, Kip!\" Kip looked up at the tall tree and felt a little scared. The branches were so far away!\n\n\"What if I fall?\" asked Kip.\n\n\"I will be right here,\" said his mum with a warm smile.\n\nKip took a deep breath. He dug his sharp claws into the bark and began to climb — one step, then two, then three! His heart was beating fast, but he kept going.\n\nSoon Kip was higher than he had ever been before. He could see the whole forest! He could see the river sparkling below and a family of kangaroos bounding across the open field.\n\n\"I did it!\" Kip called out proudly. His mum gave him a big koala hug.\n\nFrom that day on, Kip was the best climber in the whole forest. Every evening he sat at the very top of the tallest gumtree and watched the beautiful Australian sunset.",
+    "questions": [
+      "What is Kip's favourite thing to eat?",
+      "Why was Kip scared to climb higher?",
+      "What could Kip see from the top of the tree?",
+      "Who helped Kip feel brave?",
+      "How did Kip feel at the end of the story?"
+    ]
+  },
+  {
+    "id": "space-1",
+    "title": "Stella's Space Adventure",
+    "theme": "Space",
+    "emoji": "🚀",
+    "coverColor": "#3D4F8B",
+    "keywords": ["rocket", "planet", "stars", "astronaut", "moon"],
+    "text": "Stella was a seven-year-old girl who loved looking at the night sky from her backyard in Sydney. She could name every star constellation and dreamed of one day flying to space.\n\nOne magical night, a tiny silver rocket landed in her garden with a soft whoosh. A friendly robot poked its round head out and said, \"Would you like to visit the moon, Stella?\"\n\nStella could not believe it! She grabbed her helmet from her toy box — just in case — and climbed aboard the rocket.\n\nZoom! The rocket blasted off into the dark, sparkling sky. Stella pressed her nose against the window. The stars looked like a million tiny diamonds scattered across a black velvet blanket.\n\nWhen they reached the moon, Stella bounced across the dusty grey surface. Each step sent her floating upward because the moon has much less gravity than Earth. \"This is amazing!\" she laughed.\n\nThe robot pointed to a distant blue dot. \"That is Earth,\" it said quietly. Stella stared at her home planet, small and precious among all the stars.\n\n\"I will always look after you,\" she whispered to Earth.\n\nThe rocket brought her safely home just before sunrise. Stella climbed into bed with a big smile on her face, already excited to look up at the stars again that night.",
+    "questions": [
+      "Where did Stella live?",
+      "What landed in Stella's garden?",
+      "What did the stars look like through the rocket window?",
+      "Why did Stella float on the moon?",
+      "What did Stella promise to Earth?"
+    ]
+  },
+  {
+    "id": "magic-1",
+    "title": "The Magic Paintbrush",
+    "theme": "Magic",
+    "emoji": "🪄",
+    "coverColor": "#8B5CF6",
+    "keywords": ["paintbrush", "magic", "rainbow", "dragon", "wish"],
+    "text": "In the small town of Willowbrook there lived a girl named Luna who loved to paint. But Luna was very poor and could only draw pictures in the mud with a stick.\n\nOne afternoon, while helping an old woman carry her heavy basket, the woman smiled and pressed something into Luna's hand. It was a beautiful golden paintbrush with bristles that sparkled like sunlight.\n\n\"This is a magic paintbrush,\" the woman said. \"Whatever you paint will come to life — but use it wisely.\"\n\nLuna could hardly wait. She ran home and painted a small loaf of bread. Pop! A real, warm, crusty loaf appeared on her table. She painted a cosy blanket. Swoosh! A soft, rainbow-coloured blanket wrapped itself around her shoulders.\n\nWord spread through the town. The greedy mayor heard about the paintbrush and ordered Luna to paint him bags of gold. Luna refused. Instead, she painted a magnificent, friendly dragon who breathed gentle warm air over the cold village.\n\nThe mayor was so shocked that he ran away and was never seen again. The dragon became the town's protector, and Luna used her magic paintbrush to make life better for everyone.\n\nShe painted a school, a playground, a library full of books, and a garden bursting with flowers. Willowbrook became the happiest town in the whole land.\n\n\"True magic,\" Luna said, \"is sharing what you have with others.\"",
+    "questions": [
+      "What did Luna use to draw pictures before she got the paintbrush?",
+      "Who gave Luna the magic paintbrush?",
+      "What did Luna paint first?",
+      "What did the greedy mayor want Luna to paint?",
+      "What is the message at the end of the story?"
+    ]
+  }
+]
