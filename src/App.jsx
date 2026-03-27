@@ -159,18 +159,25 @@ export default function App() {
 
   // Persist story selection
   useEffect(() => {
+    let saved = null
     try {
-      const saved = localStorage.getItem('koalaread-story')
-      if (saved) {
-        const found = stories.find(s => s.id === saved)
-        if (found) setSelectedStory(found)
-      }
-      // Check if puzzle was previously unlocked for this story
-      const ul = safeParseUnlocked()
-      if (saved && ul.includes(saved)) setPuzzleUnlocked(true)
-    } catch {
+      saved = localStorage.getItem('koalaread-story')
+    } catch (err) {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
+      if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
+        // Log in development so non-storage issues are visible
+        console.error('Failed to read koalaread-story from localStorage', err)
+      }
+      return
     }
+
+    if (saved) {
+      const found = stories.find(s => s.id === saved)
+      if (found) setSelectedStory(found)
+    }
+    // Check if puzzle was previously unlocked for this story
+   const ul = safeParseUnlocked()
+    if (saved && ul.includes(saved)) setPuzzleUnlocked(true)
   }, [])
 
   const handleSelectStory = (story) => {
