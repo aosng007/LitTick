@@ -70,19 +70,30 @@ export default function Checklist({ storyId }) {
   // Load saved state from LocalStorage
   useEffect(() => {
     if (!storyId) return
+    let raw = null
     try {
-      const saved = JSON.parse(localStorage.getItem(storageKey(storyId)) || '{}')
+      raw = localStorage.getItem(storageKey(storyId))
+    } catch {
+      // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
+      return
+    }
+    try {
+      const saved = JSON.parse(raw || '{}')
       setChecked(saved.checked || {})
       setNotes(saved.notes || {})
     } catch {
-      // ignore corrupt data
+      // ignore corrupt / non-JSON data
     }
   }, [storyId])
 
   // Persist to LocalStorage whenever checked/notes change
   useEffect(() => {
     if (!storyId) return
-    localStorage.setItem(storageKey(storyId), JSON.stringify({ checked, notes }))
+    try {
+      localStorage.setItem(storageKey(storyId), JSON.stringify({ checked, notes }))
+    } catch {
+      // localStorage unavailable – storage restriction
+    }
   }, [storyId, checked, notes])
 
   const toggle = (id) =>

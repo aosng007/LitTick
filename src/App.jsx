@@ -159,7 +159,18 @@ export default function App() {
 
   // Persist story selection
   useEffect(() => {
-    const saved = localStorage.getItem('koalaread-story')
+    let saved = null
+    try {
+      saved = localStorage.getItem('koalaread-story')
+    } catch (err) {
+      // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
+      if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production') {
+        // Log in development so non-storage issues are visible
+        console.error('Failed to read koalaread-story from localStorage', err)
+      }
+      return
+    }
+
     if (saved) {
       const found = stories.find(s => s.id === saved)
       if (found) setSelectedStory(found)
@@ -172,7 +183,7 @@ export default function App() {
   const handleSelectStory = (story) => {
     setSelectedStory(story)
     setActiveTab('read')
-    localStorage.setItem('koalaread-story', story.id)
+    try { localStorage.setItem('koalaread-story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
     // Restore puzzle unlock state
     const ul = safeParseUnlocked()
     setPuzzleUnlocked(ul.includes(story.id))
@@ -183,7 +194,9 @@ export default function App() {
     setPuzzleUnlocked(true)
     const ul = safeParseUnlocked()
     if (!ul.includes(selectedStory.id)) {
-      localStorage.setItem('koalaread-unlocked', JSON.stringify([...ul, selectedStory.id]))
+      try {
+        localStorage.setItem('koalaread-unlocked', JSON.stringify([...ul, selectedStory.id]))
+      } catch { /* localStorage unavailable – storage restriction */ }
     }
     // Auto-switch to puzzle tab after a short delay; store id so we can cancel it
     puzzleTabTimeoutRef.current = setTimeout(() => setActiveTab('puzzle'), 1200)
@@ -195,7 +208,7 @@ export default function App() {
     setSelectedStory(null)
     setActiveTab('read')
     setPuzzleUnlocked(false)
-    localStorage.removeItem('koalaread-story')
+    try { localStorage.removeItem('koalaread-story') } catch { /* localStorage unavailable – storage restriction */ }
   }
 
   // ── Story selection screen ────────────────────────────────────────────────
