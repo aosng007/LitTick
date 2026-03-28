@@ -107,7 +107,7 @@ function RewardBadge({ onDismiss }) {
 // ---------------------------------------------------------------------------
 export default function Timer({ onTimerComplete }) {
   const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
-  const [isRunning, setIsRunning] = useState(false)
+  const [isTimerActive, setIsTimerActive] = useState(false)
   const [hasFinished, setHasFinished] = useState(false)
   const [showBadge, setShowBadge] = useState(false)
   const intervalRef = useRef(null)
@@ -143,12 +143,12 @@ export default function Timer({ onTimerComplete }) {
 
   // Tick
   useEffect(() => {
-    if (isRunning && !hasFinished) {
+    if (isTimerActive && !hasFinished) {
       intervalRef.current = setInterval(() => {
         setSecondsLeft(prev => {
           if (prev <= 1) {
             clearInterval(intervalRef.current)
-            setIsRunning(false)
+            setIsTimerActive(false)
             setHasFinished(true)
             setShowBadge(true)
             playRewardChime(audioCtxRef.current)
@@ -160,16 +160,16 @@ export default function Timer({ onTimerComplete }) {
       }, 1000)
     }
     return () => clearInterval(intervalRef.current)
-  }, [isRunning, hasFinished, onTimerComplete])
+  }, [isTimerActive, hasFinished, onTimerComplete])
 
   const handleStart = useCallback(() => {
     ensureAudioContext()
-    setIsRunning(true)
+    setIsTimerActive(true)
   }, [ensureAudioContext])
-  const handlePause = useCallback(() => setIsRunning(false), [])
+  const handlePause = useCallback(() => setIsTimerActive(false), [])
   const handleReset = useCallback(() => {
     clearInterval(intervalRef.current)
-    setIsRunning(false)
+    setIsTimerActive(false)
     setHasFinished(false)
     setSecondsLeft(TOTAL_SECONDS)
     // Close any open AudioContext so it can be freshly created on next Start
@@ -222,14 +222,14 @@ export default function Timer({ onTimerComplete }) {
               {timeString}
             </span>
             <span className="text-xs text-gray-400 font-semibold mt-0.5">
-              {hasFinished ? 'Done! 🎉' : isRunning ? 'Reading…' : 'Ready?'}
+              {hasFinished ? 'Done! 🎉' : isTimerActive ? 'Reading…' : 'Ready?'}
             </span>
           </div>
         </div>
 
         {/* Control buttons */}
         <div className="flex gap-3 flex-wrap justify-center">
-          {!isRunning && !hasFinished && (
+          {!isTimerActive && !hasFinished && (
             <button
               onClick={handleStart}
               className="rounded-2xl bg-koala-green px-6 py-3 text-white font-bold text-base shadow-md hover:bg-koala-teal active:scale-95 transition-all"
@@ -238,7 +238,7 @@ export default function Timer({ onTimerComplete }) {
               ▶ Start
             </button>
           )}
-          {isRunning && (
+          {isTimerActive && (
             <button
               onClick={handlePause}
               className="rounded-2xl bg-amber-400 px-6 py-3 text-white font-bold text-base shadow-md hover:bg-amber-500 active:scale-95 transition-all"
@@ -247,7 +247,7 @@ export default function Timer({ onTimerComplete }) {
               ⏸ Pause
             </button>
           )}
-          {(!isRunning && secondsLeft < TOTAL_SECONDS) && (
+          {(!isTimerActive && secondsLeft < TOTAL_SECONDS) && (
             <>
               {!hasFinished && (
                 <button
@@ -279,7 +279,7 @@ export default function Timer({ onTimerComplete }) {
         </div>
 
         {/* Motivational message */}
-        {isRunning && (
+        {isTimerActive && (
           <p className="text-sm text-koala-teal font-semibold animate-pulse-slow text-center">
             📖 Great job reading! Keep going! 🌟
           </p>

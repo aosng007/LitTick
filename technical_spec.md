@@ -36,7 +36,7 @@ All developers **must** use the exact variable/state names defined here. Aliases
 | State variable | Type | Setter | Description |
 |----------------|------|--------|-------------|
 | `selectedStory` | `object \| null` | `setSelectedStory` | The story object currently loaded. `null` means the selection screen is shown. |
-| `activeTab` | `'read' \| 'timer' \| 'retell' \| 'puzzle'` | `setActiveTab` | Currently visible tab in the reading interface. |
+| `activeTab` | `'read' \| 'timer' \| 'retell' \| 'puzzle' \| 'discover'` | `setActiveTab` | Currently visible tab in the reading interface. |
 | `puzzleUnlocked` | `boolean` | `setPuzzleUnlocked` | Whether the Word Search puzzle is accessible for the current story. |
 
 ### Timer state (`Timer.jsx`)
