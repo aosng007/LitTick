@@ -58,10 +58,6 @@ const FINGERS = [
   },
 ]
 
-function storageKey(storyId) {
-  return `littick_checklist_${storyId}`
-}
-
 export default function Checklist({ storyId }) {
   const [checked, setChecked] = useState({})
   const [notes, setNotes] = useState({})
@@ -72,7 +68,7 @@ export default function Checklist({ storyId }) {
     if (!storyId) return
     let raw = null
     try {
-      raw = localStorage.getItem(storageKey(storyId))
+      raw = localStorage.getItem(`littick_checklist_${storyId}`)
     } catch {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
       return
@@ -90,7 +86,7 @@ export default function Checklist({ storyId }) {
   useEffect(() => {
     if (!storyId) return
     try {
-      localStorage.setItem(storageKey(storyId), JSON.stringify({ checked, notes }))
+      localStorage.setItem(`littick_checklist_${storyId}`, JSON.stringify({ checked, notes }))
     } catch {
       // localStorage unavailable – storage restriction
     }

@@ -29,32 +29,48 @@ function safeParseUnlocked() {
 const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || ''
 
 function useStoryBackground(theme) {
-  const [bgUrl, setBgUrl] = useState(null)
+  const [bgData, setBgData] = useState(null) // { url, attribution: { name, profileUrl, downloadLocation } }
 
   useEffect(() => {
-    if (!theme) { setBgUrl(null); return }
-    if (!UNSPLASH_ACCESS_KEY) { setBgUrl(null); return }
+    if (!theme) { setBgData(null); return }
+    if (!UNSPLASH_ACCESS_KEY) { setBgData(null); return }
 
     // Clear stale background immediately when theme changes
-    setBgUrl(null)
+    setBgData(null)
 
     const controller = new AbortController()
     let canceled = false
 
     const url = `https://api.unsplash.com/photos/random?query=${encodeURIComponent(theme)}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`
     fetch(url, { signal: controller.signal })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (canceled || controller.signal.aborted) return
         if (data && data.urls && data.urls.regular) {
-          setBgUrl(data.urls.regular)
+          const newBgData = {
+            url: data.urls.regular,
+            attribution: {
+              name: data.user?.name || 'Unknown',
+              profileUrl: data.user?.links?.html || 'https://unsplash.com',
+              downloadLocation: data.links?.download_location || null,
+            },
+          }
+          setBgData(newBgData)
+          // Trigger Unsplash download tracking as required by their API guidelines
+          if (newBgData.attribution.downloadLocation) {
+            fetch(`${newBgData.attribution.downloadLocation}?client_id=${UNSPLASH_ACCESS_KEY}`)
+              .catch(() => { /* best-effort tracking – ignore failures */ })
+          }
         } else {
-          setBgUrl(null)
+          setBgData(null)
         }
       })
       .catch(err => {
         if (canceled || (err && err.name === 'AbortError')) return
-        setBgUrl(null)
+        setBgData(null)
       })
 
     return () => {
@@ -63,7 +79,7 @@ function useStoryBackground(theme) {
     }
   }, [theme])
 
-  return bgUrl
+  return bgData
 }
 
 // ---------------------------------------------------------------------------
@@ -88,7 +104,10 @@ function DictionaryPopover({ word, onClose }) {
     let canceled = false
 
     fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`, { signal: controller.signal })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(json => {
         if (canceled || controller.signal.aborted) return
         if (Array.isArray(json) && json.length > 0) {
@@ -367,7 +386,7 @@ export default function App() {
   const puzzleTabTimeoutRef = useRef(null)
 
   // Fetch Unsplash background based on current story theme
-  const bgUrl = useStoryBackground(selectedStory?.theme || null)
+  const bgData = useStoryBackground(selectedStory?.theme || null)
 
   // Clear the auto-switch timeout when the component unmounts
   useEffect(() => {
@@ -482,11 +501,11 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col items-center px-3 py-4 sm:px-6 sm:py-6 relative">
       {/* Unsplash background image with backdrop-blur */}
-      {bgUrl ? (
+      {bgData?.url ? (
         <div
           className="fixed inset-0 -z-10 bg-cover bg-center scale-105"
           style={{
-            backgroundImage: `url(${bgUrl})`,
+            backgroundImage: `url(${bgData.url})`,
             filter: 'blur(6px) brightness(0.55)',
           }}
           aria-hidden="true"
@@ -497,6 +516,30 @@ export default function App() {
           style={{ background: `linear-gradient(135deg, ${selectedStory.coverColor}22 0%, #f0fdf4 100%)` }}
           aria-hidden="true"
         />
+      )}
+
+      {/* Unsplash attribution – required by Unsplash API guidelines */}
+      {bgData?.attribution && (
+        <div className="fixed bottom-2 right-2 z-10 text-xs text-white/60 pointer-events-auto">
+          Photo by{' '}
+          <a
+            href={bgData.attribution.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white/90"
+          >
+            {bgData.attribution.name}
+          </a>
+          {' '}on{' '}
+          <a
+            href="https://unsplash.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-white/90"
+          >
+            Unsplash
+          </a>
+        </div>
       )}
 
       {/* App header */}

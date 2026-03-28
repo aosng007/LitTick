@@ -26,7 +26,10 @@ function MagicBookshelf({ query = 'children adventure' }) {
       `https://gutendex.com/books/?search=${encodeURIComponent(query)}&mime_type=text%2Fhtml`,
       { signal: controller.signal }
     )
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (ignore) return
         setBooks((data.results || []).slice(0, 4))
@@ -118,17 +121,30 @@ function DailyNews({ topic = 'children education' }) {
 
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(topic)}&pageSize=4&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`
     fetch(url, { signal: controller.signal })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) {
+          let message
+          if (r.status === 401) {
+            message = 'News API key is invalid or missing.'
+          } else if (r.status === 429) {
+            message = 'News service rate limit reached. Please try again later.'
+          } else {
+            message = 'News service is unavailable. Please try again later.'
+          }
+          throw new Error(message)
+        }
+        return r.json()
+      })
       .then(data => {
         if (ignore) return
-        if (data.status === 'error') throw new Error('API error')
+        if (data.status === 'error') throw new Error(data.message || 'News API returned an error.')
         setArticles((data.articles || []).slice(0, 4))
         setLoading(false)
       })
       .catch(err => {
         if (ignore) return
         if (err && err.name === 'AbortError') return
-        setError('Could not load news. Please try again later.')
+        setError(err.message || 'Could not load news. Please try again later.')
         setLoading(false)
       })
 
@@ -176,7 +192,7 @@ function DailyNews({ topic = 'children education' }) {
       {NEWS_API_KEY && !loading && !error && (
         <ul className="flex flex-col gap-2">
           {articles.map((article, i) => (
-            <li key={i}>
+            <li key={article.url || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
               <a
                 href={article.url}
                 target="_blank"
@@ -223,7 +239,10 @@ function NatureExplorer() {
       : `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=4`
 
     fetch(apiUrl, { signal: controller.signal })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (ignore) return
         if (data.status !== 'ok') throw new Error('RSS feed unavailable')
@@ -277,7 +296,7 @@ function NatureExplorer() {
       {!loading && !error && (
         <ul className="flex flex-col gap-2">
           {items.map((item, i) => (
-            <li key={i}>
+            <li key={item.guid || item.link || i}>
               <a
                 href={item.link}
                 target="_blank"
