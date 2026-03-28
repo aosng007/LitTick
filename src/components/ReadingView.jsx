@@ -64,7 +64,8 @@ export default function ReadingView({ book, onBack, children }) {
           aria-label={`Reading: ${book.title}`}
           className="w-full rounded-2xl border border-amber-200"
           style={{ height: '60vh', minHeight: '320px' }}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+          sandbox="allow-scripts allow-forms"
+          referrerPolicy="strict-origin-when-cross-origin"
         />
       ) : (
         <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-gray-500 text-sm">

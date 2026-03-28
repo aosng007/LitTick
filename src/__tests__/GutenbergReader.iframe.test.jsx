@@ -1,4 +1,4 @@
-// src/__tests__/GutenbergReader.proxy.test.jsx
+// src/__tests__/GutenbergReader.iframe.test.jsx
 // Verifies that GutenbergReader uses a direct iframe embed for Gutenberg books
 // instead of fetching content via a CORS proxy.
 import { render, screen } from '@testing-library/react'
