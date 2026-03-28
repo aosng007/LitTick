@@ -10,41 +10,115 @@
 import { useState, useEffect, useRef } from 'react'
 import Checklist from './Checklist'
 import { TOTAL_SECONDS } from './Timer'
+import NATURE_STORIES from '../content/natureData'
 
 // ---------------------------------------------------------------------------
-// Local fallback stories for Year 2 students (used when RSS is unavailable)
+// GutenbergReader – inline reading view for a Gutenberg book
 // ---------------------------------------------------------------------------
-const FALLBACK_NATURE_STORIES = [
-  {
-    id: 'fallback-1',
-    title: 'The Amazing Migration of Monarch Butterflies',
-    summary:
-      'Every year, millions of monarch butterflies travel thousands of kilometres to warmer places. Scientists are amazed by how these tiny insects know which way to go!',
-    emoji: '🦋',
-  },
-  {
-    id: 'fallback-2',
-    title: 'Ocean Giants: The Humpback Whale',
-    summary:
-      'Humpback whales are famous for their beautiful songs. These giant animals can leap fully out of the water in a move called breaching. Find out how these incredible animals live!',
-    emoji: '🐋',
-  },
-  {
-    id: 'fallback-3',
-    title: 'Clever Crows: Birds That Can Solve Puzzles',
-    summary:
-      'Did you know crows are one of the smartest animals on Earth? They can use tools, remember human faces, and even plan ahead. Scientists are still learning just how clever they are!',
-    emoji: '🐦',
-  },
-]
+function GutenbergReader({ book, onBack }) {
+  const [text, setText] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // Prefer plain-text format so we can render safely as text content
+  const textUrl =
+    book.formats?.['text/plain; charset=utf-8'] ||
+    book.formats?.['text/plain; charset=us-ascii'] ||
+    book.formats?.['text/plain'] ||
+    null
+
+  const coverUrl = (() => {
+    try {
+      const raw = book.formats?.['image/jpeg'] || ''
+      const parsed = new URL(raw)
+      return parsed.protocol === 'https:' ? parsed.href : null
+    } catch {
+      return null
+    }
+  })()
+
+  useEffect(() => {
+    if (!textUrl) { setLoading(false); return }
+    let ignore = false
+    fetch(textUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.text()
+      })
+      .then(content => {
+        if (ignore) return
+        // Show first ~2,000 characters so the view stays manageable
+        setText(content.slice(0, 2000))
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!ignore) { setText(null); setLoading(false) }
+      })
+    return () => { ignore = true }
+  }, [textUrl])
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-200 active:scale-95 transition-all"
+          aria-label="Back to bookshelf"
+        >
+          ← Back
+        </button>
+        {coverUrl && (
+          <img
+            src={coverUrl}
+            alt={`Cover of ${book.title}`}
+            className="w-10 h-14 object-cover rounded shadow flex-shrink-0"
+          />
+        )}
+        <div className="min-w-0">
+          <h3 className="font-extrabold text-koala-teal text-base leading-snug line-clamp-2">{book.title}</h3>
+          <p className="text-xs text-gray-500 truncate">
+            {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
+          </p>
+        </div>
+      </div>
+
+      {/* Book content */}
+      {loading && (
+        <div className="flex items-center justify-center py-4 text-gray-400 text-sm animate-pulse">
+          📖 Loading book…
+        </div>
+      )}
+      {!loading && text && (
+        <div
+          className="rounded-2xl bg-amber-50 border border-amber-200 p-4 max-h-64 overflow-y-auto"
+          role="article"
+          aria-label={`Book text: ${book.title}`}
+        >
+          <p className="text-gray-700 leading-relaxed text-sm whitespace-pre-wrap">{text}</p>
+        </div>
+      )}
+      {!loading && !text && (
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-gray-500 text-sm">
+          📚 Full text is not available for this book.
+        </div>
+      )}
+
+      {/* Reading timer */}
+      <div className="rounded-2xl bg-white/90 border border-koala-green/20 p-4 shadow-sm">
+        <ReadingTimer />
+      </div>
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Gutenberg card – fetches real books from gutendex.com
 // ---------------------------------------------------------------------------
-function MagicBookshelf({ query = 'children' }) {
+function MagicBookshelf() {
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [selectedBook, setSelectedBook] = useState(null)
 
   useEffect(() => {
     let ignore = false
@@ -55,7 +129,7 @@ function MagicBookshelf({ query = 'children' }) {
     setBooks([])
 
     fetch(
-      `https://gutendex.com/books/?search=${encodeURIComponent(query)}`,
+      'https://gutendex.com/books?topic=children&languages=en',
       { signal: controller.signal }
     )
       .then(r => {
@@ -64,7 +138,7 @@ function MagicBookshelf({ query = 'children' }) {
       })
       .then(data => {
         if (ignore) return
-        setBooks((data.results || []).slice(0, 4))
+        setBooks((data.results || []).slice(0, 6))
         setLoading(false)
       })
       .catch(err => {
@@ -79,7 +153,17 @@ function MagicBookshelf({ query = 'children' }) {
       ignore = true
       controller.abort()
     }
-  }, [query])
+  }, [])
+
+  // Show inline reader when a book is selected
+  if (selectedBook) {
+    return (
+      <GutenbergReader
+        book={selectedBook}
+        onBack={() => setSelectedBook(null)}
+      />
+    )
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -100,22 +184,41 @@ function MagicBookshelf({ query = 'children' }) {
         <p className="text-xs text-gray-400 text-center py-2">No books found.</p>
       )}
       {!loading && !error && books.length > 0 && (
-        <ul className="flex flex-col gap-2">
-          {books.map(book => (
-            <li key={book.id}>
-              <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
-                <span className="text-lg flex-shrink-0">📖</span>
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-800 truncate">
+        <ul className="grid grid-cols-2 gap-2">
+          {books.map(book => {
+            const coverUrl = (() => {
+              try {
+                const raw = book.formats?.['image/jpeg'] || ''
+                const parsed = new URL(raw)
+                return parsed.protocol === 'https:' ? parsed.href : null
+              } catch {
+                return null
+              }
+            })()
+            return (
+              <li key={book.id}>
+                <button
+                  onClick={() => setSelectedBook(book)}
+                  className="w-full flex flex-col items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm hover:bg-amber-100 hover:border-amber-400 hover:shadow-md active:scale-[0.98] transition-all text-center"
+                  aria-label={`Read ${book.title}`}
+                >
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt={`Cover of ${book.title}`}
+                      className="w-16 h-22 object-cover rounded shadow"
+                    />
+                  ) : (
+                    <span className="text-4xl" aria-hidden="true">📖</span>
+                  )}
+                  <p className="font-bold text-gray-800 line-clamp-2 text-xs leading-snug">
                     {book.title}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
-                  </p>
-                </div>
-              </div>
-            </li>
-          ))}
+                  <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">▶ Read</p>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
@@ -406,8 +509,8 @@ function ReadingTimer() {
 // ---------------------------------------------------------------------------
 function NatureReadingView({ story, onBack }) {
   const storyId = getNatureStoryId(story)
-  // Prefer summary (fallback stories), then strip HTML from description/content
-  const text = story.summary || stripHtml(story.description || story.content || story.title || '')
+  // Prefer fullContent (local stories), then summary, then strip HTML from RSS content
+  const text = story.fullContent || story.summary || stripHtml(story.description || story.content || story.title || '')
 
   return (
     <div className="flex flex-col gap-4">
@@ -488,7 +591,7 @@ function NatureExplorer() {
       .catch(err => {
         if (ignore) return
         if (err && err.name === 'AbortError') return
-        setItems(FALLBACK_NATURE_STORIES)
+        setItems(NATURE_STORIES)
         setUsingFallback(true)
         setLoading(false)
       })
@@ -576,7 +679,7 @@ export default function DiscoveryHub({ storyTheme = 'children' }) {
       <div className="grid grid-cols-1 gap-5">
         {/* Magic Bookshelf */}
         <div className="rounded-3xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 p-4 shadow-sm">
-          <MagicBookshelf query={storyTheme} />
+          <MagicBookshelf />
         </div>
 
         {/* Daily News */}
