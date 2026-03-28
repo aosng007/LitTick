@@ -19,12 +19,23 @@ function GutenbergReader({ book, onBack }) {
   const [text, setText] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Prefer plain-text format so we can render safely as text content
-  const textUrl =
-    book.formats?.['text/plain; charset=utf-8'] ||
-    book.formats?.['text/plain; charset=us-ascii'] ||
-    book.formats?.['text/plain'] ||
-    null
+  // Prefer plain-text format so we can render safely as text content.
+  // Validate the URL and upgrade http → https to avoid mixed-content failures.
+  const textUrl = (() => {
+    const raw =
+      book.formats?.['text/plain; charset=utf-8'] ||
+      book.formats?.['text/plain; charset=us-ascii'] ||
+      book.formats?.['text/plain'] ||
+      null
+    if (!raw) return null
+    try {
+      const parsed = new URL(raw)
+      if (parsed.protocol === 'http:') parsed.protocol = 'https:'
+      return parsed.protocol === 'https:' ? parsed.href : null
+    } catch {
+      return null
+    }
+  })()
 
   const coverUrl = (() => {
     try {
@@ -206,7 +217,7 @@ function MagicBookshelf() {
                     <img
                       src={coverUrl}
                       alt={`Cover of ${book.title}`}
-                      className="w-16 h-22 object-cover rounded shadow"
+                      className="w-16 h-[88px] object-cover rounded shadow"
                     />
                   ) : (
                     <span className="text-4xl" aria-hidden="true">📖</span>
@@ -535,7 +546,11 @@ function NatureReadingView({ story, onBack }) {
         role="article"
         aria-label={`Story text: ${story.title}`}
       >
-        <p className="text-gray-700 leading-relaxed text-base">{text}</p>
+        {text.split('\n\n').map((para) => (
+          <p key={para.slice(0, 40)} className="text-gray-700 leading-relaxed text-base mb-3 last:mb-0">
+            {para.trim()}
+          </p>
+        ))}
       </div>
 
       {/* Timer – auto-starts immediately */}
