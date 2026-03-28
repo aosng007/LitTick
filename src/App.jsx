@@ -11,6 +11,33 @@ import Achievements from './components/Achievements'
 import stories from './content/Year2Texts.json'
 
 // ---------------------------------------------------------------------------
+// One-time migration: move legacy koalaread-* keys to littick_* equivalents
+// so returning users don't lose their progress after the rename.
+// Called at module load (not inside a component) so it runs exactly once.
+// ---------------------------------------------------------------------------
+function migrateStorageKeys() {
+  try {
+    // Selected story
+    if (!localStorage.getItem('littick_selected_story')) {
+      const legacy = localStorage.getItem('koalaread-story')
+      if (legacy) {
+        try { localStorage.setItem('littick_selected_story', legacy) } catch { /* ignore */ }
+        try { localStorage.removeItem('koalaread-story') } catch { /* ignore */ }
+      }
+    }
+    // Unlocked stories
+    if (!localStorage.getItem('littick_unlocked_stories')) {
+      const legacy = localStorage.getItem('koalaread-unlocked')
+      if (legacy) {
+        try { localStorage.setItem('littick_unlocked_stories', legacy) } catch { /* ignore */ }
+        try { localStorage.removeItem('koalaread-unlocked') } catch { /* ignore */ }
+      }
+    }
+  } catch { /* localStorage unavailable – skip migration */ }
+}
+migrateStorageKeys()
+
+// ---------------------------------------------------------------------------
 // Helper – safely parse the unlocked-stories array from localStorage
 // ---------------------------------------------------------------------------
 function safeParseUnlocked() {

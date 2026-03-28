@@ -14,7 +14,7 @@ All keys written to `localStorage` **must** use the `littick_` prefix. Using any
 |-----|------|-------------|
 | `littick_selected_story` | `string` | ID of the story currently selected by the user (e.g. `"koala"`, `"space"`, `"magic"`). |
 | `littick_unlocked_stories` | `JSON string → string[]` | Array of story IDs for which the 15-minute timer has been completed (e.g. `["koala","space"]`). |
-| `littick_timer_state` | `JSON string → object` | Persisted timer snapshot: `{ secondsLeft: number, hasFinished: boolean }`. Used to restore the timer after a page reload. |
+| `littick_timer_state` | `JSON string → object` | Persisted timer snapshot: `{ secondsLeft: number, hasFinished: boolean, isTimerActive: boolean, lastSavedAt: number \| null }`. `lastSavedAt` is the `Date.now()` value at the time of the last save; used to fast-forward elapsed time on page reload. |
 | `littick_checklist_<storyId>` | `JSON string → object` | Five Finger Retell state for a specific story: `{ checked: Record<string,boolean>, notes: Record<string,string> }`. `<storyId>` is replaced by the story ID (e.g. `littick_checklist_koala`). |
 | `littick_user_badges` | `JSON string → string[]` | Array of badge identifiers earned by the user (e.g. `["reading_star","puzzle_master"]`). |
 

@@ -193,12 +193,11 @@ export default function Timer({ onTimerComplete }) {
     const saved = loadTimerState()
     if (!saved) return TOTAL_SECONDS
     if (saved.hasFinished) return 0
-    // If the timer was actively running, compute how much time has elapsed
-    // since we last saved, so we can restore accurately after a page refresh.
-    if (saved.isTimerActive && saved.startTimestamp) {
-      const elapsed = Math.floor((Date.now() - saved.startTimestamp) / 1000)
-      const remaining = Math.max(0, saved.secondsLeft - elapsed)
-      return remaining
+    // If the timer was actively running, account for the time elapsed since the
+    // last save (not since run start) to avoid double-counting decremented seconds.
+    if (saved.isTimerActive && typeof saved.lastSavedAt === 'number') {
+      const elapsed = Math.floor((Date.now() - saved.lastSavedAt) / 1000)
+      return Math.max(0, saved.secondsLeft - elapsed)
     }
     return typeof saved.secondsLeft === 'number' ? saved.secondsLeft : TOTAL_SECONDS
   })
@@ -217,8 +216,6 @@ export default function Timer({ onTimerComplete }) {
   const [showConfetti, setShowConfetti] = useState(false)
   const intervalRef = useRef(null)
   const audioCtxRef = useRef(null)
-  // Track when the current active run started (for timestamp-based persistence)
-  const runStartRef = useRef(null)
 
   // Create (or reuse) an AudioContext during a user gesture so the browser
   // allows audio playback later when the timer fires.
@@ -248,16 +245,19 @@ export default function Timer({ onTimerComplete }) {
     : secondsLeft > 60  ? '#F59E0B'
     : '#EF4444'
 
-  // Persist timer state whenever relevant values change
+  // Persist timer state whenever relevant values change.
+  // `lastSavedAt` records the wall-clock time of this snapshot so that on the
+  // next load we can compute exactly how much time elapsed while the tab was
+  // away, without double-counting seconds already decremented before the save.
   useEffect(() => {
     if (hasFinished) {
-      saveTimerState({ secondsLeft: 0, hasFinished: true, isTimerActive: false, startTimestamp: null })
+      saveTimerState({ secondsLeft: 0, hasFinished: true, isTimerActive: false, lastSavedAt: null })
     } else {
       saveTimerState({
         secondsLeft,
         hasFinished: false,
         isTimerActive,
-        startTimestamp: isTimerActive ? (runStartRef.current ?? Date.now()) : null,
+        lastSavedAt: isTimerActive ? Date.now() : null,
       })
     }
   }, [secondsLeft, isTimerActive, hasFinished])
@@ -265,10 +265,6 @@ export default function Timer({ onTimerComplete }) {
   // Tick
   useEffect(() => {
     if (isTimerActive && !hasFinished) {
-      // Record when this run leg started (used for timestamp-based persistence)
-      if (!runStartRef.current) {
-        runStartRef.current = Date.now()
-      }
       intervalRef.current = setInterval(() => {
         setSecondsLeft(prev => {
           if (prev <= 1) {
@@ -286,10 +282,7 @@ export default function Timer({ onTimerComplete }) {
         })
       }, 1000)
     }
-    return () => {
-      clearInterval(intervalRef.current)
-      if (!isTimerActive) runStartRef.current = null
-    }
+    return () => clearInterval(intervalRef.current)
   }, [isTimerActive, hasFinished, onTimerComplete])
 
   // Dismiss confetti after 4 seconds automatically
@@ -301,16 +294,11 @@ export default function Timer({ onTimerComplete }) {
 
   const handleStart = useCallback(() => {
     ensureAudioContext()
-    runStartRef.current = Date.now()
     setIsTimerActive(true)
   }, [ensureAudioContext])
-  const handlePause = useCallback(() => {
-    runStartRef.current = null
-    setIsTimerActive(false)
-  }, [])
+  const handlePause = useCallback(() => setIsTimerActive(false), [])
   const handleReset = useCallback(() => {
     clearInterval(intervalRef.current)
-    runStartRef.current = null
     setIsTimerActive(false)
     setHasFinished(false)
     setSecondsLeft(TOTAL_SECONDS)

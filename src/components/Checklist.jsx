@@ -73,6 +73,16 @@ export default function Checklist({ storyId }) {
     let raw = null
     try {
       raw = localStorage.getItem(storageKey(storyId))
+      // One-time migration: if new key is empty, check the legacy key
+      if (!raw) {
+        const legacyKey = `koalaread-checklist-${storyId}`
+        const legacyRaw = localStorage.getItem(legacyKey)
+        if (legacyRaw) {
+          raw = legacyRaw
+          try { localStorage.setItem(storageKey(storyId), legacyRaw) } catch { /* ignore */ }
+          try { localStorage.removeItem(legacyKey) } catch { /* ignore */ }
+        }
+      }
     } catch {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
       return
