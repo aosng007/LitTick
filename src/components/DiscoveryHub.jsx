@@ -10,11 +10,11 @@ import { useState, useEffect } from 'react'
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-/** Returns `url` only if it is a valid http/https URL; otherwise null. */
+/** Returns a normalized URL string only if it is a valid http/https URL; otherwise null. */
 function safeHttpUrl(url) {
   try {
     const parsed = new URL(url || '')
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? url : null
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : null
   } catch {
     return null
   }

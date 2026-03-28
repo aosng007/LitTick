@@ -28,6 +28,16 @@ function safeParseUnlocked() {
 // ---------------------------------------------------------------------------
 const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || ''
 
+/** Validates that a URL from the Unsplash API is a well-formed https URL. */
+function safeUnsplashUrl(url) {
+  try {
+    const parsed = new URL(url || '')
+    return parsed.protocol === 'https:' ? parsed.href : null
+  } catch {
+    return null
+  }
+}
+
 function useStoryBackground(theme) {
   const [bgData, setBgData] = useState(null) // { url, attribution: { name, profileUrl, downloadLocation } }
 
@@ -50,19 +60,35 @@ function useStoryBackground(theme) {
       .then(data => {
         if (canceled || controller.signal.aborted) return
         if (data && data.urls && data.urls.regular) {
+          // Validate all URLs from the external API response before using them
+          const bgUrl = safeUnsplashUrl(data.urls.regular)
+          const profileUrl = safeUnsplashUrl(data.user?.links?.html) || 'https://unsplash.com'
+          const downloadLocation = safeUnsplashUrl(data.links?.download_location)
+          if (!bgUrl) {
+            setBgData(null)
+            return
+          }
           const newBgData = {
-            url: data.urls.regular,
+            url: bgUrl,
             attribution: {
               name: data.user?.name || 'Unknown',
-              profileUrl: data.user?.links?.html || 'https://unsplash.com',
-              downloadLocation: data.links?.download_location || null,
+              profileUrl,
+              downloadLocation,
             },
           }
           setBgData(newBgData)
           // Trigger Unsplash download tracking as required by their API guidelines
-          if (newBgData.attribution.downloadLocation) {
-            fetch(`${newBgData.attribution.downloadLocation}?client_id=${UNSPLASH_ACCESS_KEY}`)
-              .catch(() => { /* best-effort tracking – ignore failures */ })
+          if (downloadLocation) {
+            try {
+              const trackingUrl = new URL(downloadLocation)
+              if (trackingUrl.protocol === 'https:') {
+                trackingUrl.searchParams.set('client_id', UNSPLASH_ACCESS_KEY)
+                fetch(trackingUrl.toString(), { signal: controller.signal })
+                  .catch(() => { /* best-effort tracking – ignore failures */ })
+              }
+            } catch {
+              // Ignore malformed downloadLocation values
+            }
           }
         } else {
           setBgData(null)

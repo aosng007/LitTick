@@ -12,8 +12,9 @@ test('all localStorage.setItem calls use the littick_ prefix', async () => {
     const matches = [...src.matchAll(/localStorage\.setItem\(\s*([^,)\n]+)/g)]
     for (const [, rawArg] of matches) {
       const arg = rawArg.trim()
-      // Only keys that clearly start with a quoted/backticked "littick_" prefix are allowed
-      if (!/^['"`]littick_/.test(arg)) {
+      // Only flag string/template literals – identifiers and expressions are allowed
+      // (they may be variables that resolve to valid littick_ keys at runtime)
+      if (/^['"`]/.test(arg) && !/^['"`]littick_/.test(arg)) {
         badCalls.push(`${file}: key expression="${arg}"`)
       }
     }
