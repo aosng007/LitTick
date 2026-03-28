@@ -3,27 +3,43 @@
  * Discovery Hub – showcases three external content sources:
  *   1. Magic Bookshelf  (Project Gutenberg via gutendex.com)
  *   2. Daily News       (NewsAPI – requires API key)
- *   3. Nature Explorer  (National Geographic RSS via rss2json)
+ *   3. Nature Explorer  (National Geographic RSS via rss2json, with local fallback)
+ *
+ * All content is rendered within the app UI. No <a> tags navigate away from the app.
  */
 import { useState, useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
-// Helpers
+// Local fallback stories for Year 2 students (used when RSS is unavailable)
 // ---------------------------------------------------------------------------
-/** Returns a normalized URL string only if it is a valid http/https URL; otherwise null. */
-function safeHttpUrl(url) {
-  try {
-    const parsed = new URL(url || '')
-    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? parsed.href : null
-  } catch {
-    return null
-  }
-}
+const FALLBACK_NATURE_STORIES = [
+  {
+    id: 'fallback-1',
+    title: 'The Amazing Migration of Monarch Butterflies',
+    summary:
+      'Every year, millions of monarch butterflies travel thousands of kilometres to warmer places. Scientists are amazed by how these tiny insects know which way to go!',
+    emoji: '🦋',
+  },
+  {
+    id: 'fallback-2',
+    title: 'Ocean Giants: The Humpback Whale',
+    summary:
+      'Humpback whales are famous for their beautiful songs. These giant animals can leap fully out of the water in a move called breaching. Find out how these incredible animals live!',
+    emoji: '🐋',
+  },
+  {
+    id: 'fallback-3',
+    title: 'Clever Crows: Birds That Can Solve Puzzles',
+    summary:
+      'Did you know crows are one of the smartest animals on Earth? They can use tools, remember human faces, and even plan ahead. Scientists are still learning just how clever they are!',
+    emoji: '🐦',
+  },
+]
 
 // ---------------------------------------------------------------------------
 // Gutenberg card – fetches real books from gutendex.com
 // ---------------------------------------------------------------------------
-function MagicBookshelf({ query = 'children adventure' }) {
+function MagicBookshelf({ query = 'children' }) {
   const [books, setBooks] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -36,7 +52,7 @@ function MagicBookshelf({ query = 'children adventure' }) {
     setError(null)
 
     fetch(
-      `https://gutendex.com/books/?search=${encodeURIComponent(query)}&mime_type=text%2Fhtml`,
+      `https://gutendex.com/books/?search=${encodeURIComponent(query)}`,
       { signal: controller.signal }
     )
       .then(r => {
@@ -82,34 +98,20 @@ function MagicBookshelf({ query = 'children adventure' }) {
       <ul className="flex flex-col gap-2">
         {books.map(book => (
           <li key={book.id}>
-            <a
-              href={`https://www.gutenberg.org/ebooks/${book.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm hover:bg-amber-100 transition-colors group"
-            >
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
               <span className="text-lg flex-shrink-0">📖</span>
               <div className="min-w-0">
-                <p className="font-bold text-gray-800 truncate group-hover:text-amber-700">
+                <p className="font-bold text-gray-800 truncate">
                   {book.title}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
                   {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
                 </p>
               </div>
-              <span className="ml-auto text-amber-500 flex-shrink-0">→</span>
-            </a>
+            </div>
           </li>
         ))}
       </ul>
-      <a
-        href={`https://www.gutenberg.org/ebooks/search/?query=${encodeURIComponent(query)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="self-end text-xs text-amber-600 hover:text-amber-800 underline"
-      >
-        See all books →
-      </a>
     </div>
   )
 }
@@ -183,14 +185,6 @@ function DailyNews({ topic = 'children education' }) {
             <code className="bg-blue-100 px-1 rounded">VITE_NEWS_API_KEY</code>{' '}
             in your <code className="bg-blue-100 px-1 rounded">.env</code> file to enable live news.
           </p>
-          <a
-            href="https://newsapi.org/register"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block mt-2 text-xs underline text-blue-600 hover:text-blue-800"
-          >
-            Get a free API key →
-          </a>
         </div>
       )}
 
@@ -204,63 +198,41 @@ function DailyNews({ topic = 'children education' }) {
       )}
       {NEWS_API_KEY && !loading && !error && (
         <ul className="flex flex-col gap-2">
-          {articles.map((article, i) => {
-            const safeUrl = safeHttpUrl(article.url)
-            return (
-            <li key={safeUrl || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
-              {safeUrl ? (
-                <a
-                  href={safeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm hover:bg-sky-100 transition-colors group"
-                >
-                  <span className="text-lg flex-shrink-0">📄</span>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-sky-700">
-                      {article.title}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
-                  </div>
-                  <span className="ml-auto text-sky-500 flex-shrink-0">→</span>
-                </a>
-              ) : (
-                <div
-                  className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm opacity-60 cursor-not-allowed"
-                  aria-disabled="true"
-                >
-                  <span className="text-lg flex-shrink-0">📄</span>
-                  <div className="min-w-0">
-                    <p className="font-bold text-gray-800 line-clamp-2">{article.title}</p>
-                    <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
-                  </div>
+          {articles.map((article, i) => (
+            <li key={article.url || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
+              <div className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm">
+                <span className="text-lg flex-shrink-0">📄</span>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-800 line-clamp-2">
+                    {article.title}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
                 </div>
-              )}
+              </div>
             </li>
-            )
-          })}
-        </ul> 
+          ))}
+        </ul>
       )}
     </div>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Nature Explorer card – Nat Geo RSS via rss2json proxy
+// Nature Explorer card – Nat Geo RSS via rss2json proxy, with local fallback
 // ---------------------------------------------------------------------------
 const RSS2JSON_KEY = import.meta.env.VITE_RSS2JSON_API_KEY || ''
 
 function NatureExplorer() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const [usingFallback, setUsingFallback] = useState(false)
 
   useEffect(() => {
     let ignore = false
     const controller = new AbortController()
 
     setLoading(true)
-    setError(null)
+    setUsingFallback(false)
 
     const rssUrl = 'https://www.nationalgeographic.com/animals/rss'
     const apiUrl = RSS2JSON_KEY
@@ -274,14 +246,18 @@ function NatureExplorer() {
       })
       .then(data => {
         if (ignore) return
-        if (data.status !== 'ok') throw new Error('RSS feed unavailable')
-        setItems((data.items || []).slice(0, 4))
+        if (data.status !== 'ok' || !data.items || data.items.length === 0) {
+          throw new Error('RSS feed unavailable')
+        }
+        setItems(data.items.slice(0, 4))
+        setUsingFallback(false)
         setLoading(false)
       })
       .catch(err => {
         if (ignore) return
         if (err && err.name === 'AbortError') return
-        setError('Could not load stories. Try again later.')
+        setItems(FALLBACK_NATURE_STORIES)
+        setUsingFallback(true)
         setLoading(false)
       })
 
@@ -296,7 +272,9 @@ function NatureExplorer() {
       <div className="flex items-center gap-2">
         <span className="text-2xl">🌿</span>
         <h3 className="font-extrabold text-koala-teal text-base">Nature Explorer</h3>
-        <span className="text-xs text-gray-400 ml-auto">Nat Geo Animals</span>
+        <span className="text-xs text-gray-400 ml-auto">
+          {usingFallback ? 'Nature Stories' : 'Nat Geo Animals'}
+        </span>
       </div>
 
       {loading && (
@@ -304,55 +282,30 @@ function NatureExplorer() {
           🌿 Loading nature stories…
         </div>
       )}
-      {error && (
-        <div className="flex flex-col gap-2">
-          <p className="text-xs text-orange-500 text-center py-1">{error}</p>
-          <a
-            href="https://www.nationalgeographic.com/animals"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl bg-green-50 border border-green-200 px-3 py-3 text-sm hover:bg-green-100 transition-colors flex items-center gap-2"
-          >
-            <span className="text-xl">🦁</span>
-            <div>
-              <p className="font-bold text-gray-800">Explore Animals on Nat Geo</p>
-              <p className="text-xs text-gray-500">nationalgeographic.com/animals</p>
-            </div>
-            <span className="ml-auto text-green-500">→</span>
-          </a>
-        </div>
-      )}
-      {!loading && !error && (
+      {!loading && (
         <ul className="flex flex-col gap-2">
           {items.map((item, i) => {
-            const safeLink = safeHttpUrl(item.link)
+            const isFallback = usingFallback
             return (
-            <li key={item.guid || safeLink || i}>
-              <a
-                href={safeLink || 'https://www.nationalgeographic.com/animals'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm hover:bg-green-100 transition-colors group"
-              >
-                {safeHttpUrl(item.thumbnail) ? (
-                  <img
-                    src={safeHttpUrl(item.thumbnail)}
-                    alt=""
-                    className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                ) : (
-                  <span className="text-lg flex-shrink-0">🦁</span>
-                )}
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-green-700">
-                    {item.title}
-                  </p>
-                  <p className="text-xs text-gray-500">National Geographic</p>
+              <li key={item.id || item.guid || i}>
+                <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm">
+                  {isFallback ? (
+                    <span className="text-lg flex-shrink-0">{item.emoji}</span>
+                  ) : (
+                    <span className="text-lg flex-shrink-0">🦁</span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-800 line-clamp-2">
+                      {item.title}
+                    </p>
+                    {isFallback ? (
+                      <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{item.summary}</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">National Geographic</p>
+                    )}
+                  </div>
                 </div>
-                <span className="ml-auto text-green-500 flex-shrink-0">→</span>
-              </a>
-            </li>
+              </li>
             )
           })}
         </ul>
@@ -364,7 +317,7 @@ function NatureExplorer() {
 // ---------------------------------------------------------------------------
 // Discovery Hub – main export
 // ---------------------------------------------------------------------------
-export default function DiscoveryHub({ storyTheme = 'children adventure' }) {
+export default function DiscoveryHub({ storyTheme = 'children' }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
