@@ -50,6 +50,7 @@ function MagicBookshelf({ query = 'children' }) {
 
     setLoading(true)
     setError(null)
+    setBooks([])
 
     fetch(
       `https://gutendex.com/books/?search=${encodeURIComponent(query)}`,
@@ -67,6 +68,7 @@ function MagicBookshelf({ query = 'children' }) {
       .catch(err => {
         if (ignore) return
         if (err && err.name === 'AbortError') return
+        setBooks([])
         setError('Could not load books. Please try again later.')
         setLoading(false)
       })
@@ -95,23 +97,25 @@ function MagicBookshelf({ query = 'children' }) {
       {!loading && !error && books.length === 0 && (
         <p className="text-xs text-gray-400 text-center py-2">No books found.</p>
       )}
-      <ul className="flex flex-col gap-2">
-        {books.map(book => (
-          <li key={book.id}>
-            <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
-              <span className="text-lg flex-shrink-0">📖</span>
-              <div className="min-w-0">
-                <p className="font-bold text-gray-800 truncate">
-                  {book.title}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
-                </p>
+      {!loading && !error && books.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {books.map(book => (
+            <li key={book.id}>
+              <div className="flex items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
+                <span className="text-lg flex-shrink-0">📖</span>
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-800 truncate">
+                    {book.title}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
+                  </p>
+                </div>
               </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
@@ -284,12 +288,10 @@ function NatureExplorer() {
       )}
       {!loading && (
         <ul className="flex flex-col gap-2">
-          {items.map((item, i) => {
-            const isFallback = usingFallback
-            return (
-              <li key={item.id || item.guid || i}>
+          {items.map((item, i) => (
+              <li key={item.id || item.guid || item.link || i}>
                 <div className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm">
-                  {isFallback ? (
+                  {usingFallback ? (
                     <span className="text-lg flex-shrink-0">{item.emoji}</span>
                   ) : (
                     <span className="text-lg flex-shrink-0">🦁</span>
@@ -298,7 +300,7 @@ function NatureExplorer() {
                     <p className="font-bold text-gray-800 line-clamp-2">
                       {item.title}
                     </p>
-                    {isFallback ? (
+                    {usingFallback ? (
                       <p className="text-xs text-gray-600 line-clamp-2 mt-0.5">{item.summary}</p>
                     ) : (
                       <p className="text-xs text-gray-500">National Geographic</p>
@@ -306,8 +308,7 @@ function NatureExplorer() {
                   </div>
                 </div>
               </li>
-            )
-          })}
+            ))}
         </ul>
       )}
     </div>
