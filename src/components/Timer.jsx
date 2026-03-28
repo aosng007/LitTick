@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 
-const TOTAL_SECONDS = 15 * 60 // 15 minutes
+export const TOTAL_SECONDS = 15 * 60 // 15 minutes
 const TIMER_STATE_KEY = 'littick_timer_state'
 const BADGES_KEY = 'littick_user_badges'
 
