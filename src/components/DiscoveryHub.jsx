@@ -16,18 +16,33 @@ function MagicBookshelf({ query = 'children adventure' }) {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let ignore = false
+    const controller = new AbortController()
+
     setLoading(true)
     setError(null)
-    fetch(`https://gutendex.com/books/?search=${encodeURIComponent(query)}&mime_type=text%2Fhtml`)
+
+    fetch(
+      `https://gutendex.com/books/?search=${encodeURIComponent(query)}&mime_type=text%2Fhtml`,
+      { signal: controller.signal }
+    )
       .then(r => r.json())
       .then(data => {
+        if (ignore) return
         setBooks((data.results || []).slice(0, 4))
         setLoading(false)
       })
-      .catch(() => {
+      .catch(err => {
+        if (ignore) return
+        if (err && err.name === 'AbortError') return
         setError('Could not load books. Please try again later.')
         setLoading(false)
       })
+
+    return () => {
+      ignore = true
+      controller.abort()
+    }
   }, [query])
 
   return (
@@ -95,20 +110,32 @@ function DailyNews({ topic = 'children education' }) {
 
   useEffect(() => {
     if (!NEWS_API_KEY) return
+    let ignore = false
+    const controller = new AbortController()
+
     setLoading(true)
     setError(null)
+
     const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(topic)}&pageSize=4&sortBy=publishedAt&apiKey=${NEWS_API_KEY}`
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
+        if (ignore) return
         if (data.status === 'error') throw new Error('API error')
         setArticles((data.articles || []).slice(0, 4))
         setLoading(false)
       })
-      .catch(() => {
+      .catch(err => {
+        if (ignore) return
+        if (err && err.name === 'AbortError') return
         setError('Could not load news. Please try again later.')
         setLoading(false)
       })
+
+    return () => {
+      ignore = true
+      controller.abort()
+    }
   }, [topic])
 
   return (
@@ -184,24 +211,36 @@ function NatureExplorer() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let ignore = false
+    const controller = new AbortController()
+
     setLoading(true)
     setError(null)
+
     const rssUrl = 'https://www.nationalgeographic.com/animals/rss'
     const apiUrl = RSS2JSON_KEY
       ? `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&api_key=${RSS2JSON_KEY}&count=4`
       : `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=4`
 
-    fetch(apiUrl)
+    fetch(apiUrl, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
+        if (ignore) return
         if (data.status !== 'ok') throw new Error('RSS feed unavailable')
         setItems((data.items || []).slice(0, 4))
         setLoading(false)
       })
-      .catch(() => {
+      .catch(err => {
+        if (ignore) return
+        if (err && err.name === 'AbortError') return
         setError('Could not load stories. Try again later.')
         setLoading(false)
       })
+
+    return () => {
+      ignore = true
+      controller.abort()
+    }
   }, [])
 
   return (

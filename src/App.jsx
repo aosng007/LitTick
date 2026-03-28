@@ -35,15 +35,32 @@ function useStoryBackground(theme) {
     if (!theme) { setBgUrl(null); return }
     if (!UNSPLASH_ACCESS_KEY) { setBgUrl(null); return }
 
+    // Clear stale background immediately when theme changes
+    setBgUrl(null)
+
+    const controller = new AbortController()
+    let canceled = false
+
     const url = `https://api.unsplash.com/photos/random?query=${encodeURIComponent(theme)}&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(r => r.json())
       .then(data => {
+        if (canceled || controller.signal.aborted) return
         if (data && data.urls && data.urls.regular) {
           setBgUrl(data.urls.regular)
+        } else {
+          setBgUrl(null)
         }
       })
-      .catch(() => setBgUrl(null))
+      .catch(err => {
+        if (canceled || (err && err.name === 'AbortError')) return
+        setBgUrl(null)
+      })
+
+    return () => {
+      canceled = true
+      controller.abort()
+    }
   }, [theme])
 
   return bgUrl
@@ -59,12 +76,21 @@ function DictionaryPopover({ word, onClose }) {
   const popoverRef = useRef(null)
 
   useEffect(() => {
+    // Reset state immediately so we never show stale data from a previous word
+    setLoading(true)
+    setError(null)
+    setData(null)
+
     const clean = word.replace(/[^a-zA-Z'-]/g, '').toLowerCase()
     if (!clean) { setLoading(false); setError('No definition found.'); return }
 
-    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`)
+    const controller = new AbortController()
+    let canceled = false
+
+    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(clean)}`, { signal: controller.signal })
       .then(r => r.json())
       .then(json => {
+        if (canceled || controller.signal.aborted) return
         if (Array.isArray(json) && json.length > 0) {
           setData(json[0])
         } else {
@@ -72,10 +98,16 @@ function DictionaryPopover({ word, onClose }) {
         }
         setLoading(false)
       })
-      .catch(() => {
+      .catch(err => {
+        if (canceled || (err && err.name === 'AbortError')) return
         setError('Could not load definition.')
         setLoading(false)
       })
+
+    return () => {
+      canceled = true
+      controller.abort()
+    }
   }, [word])
 
   // Close on outside click
@@ -145,20 +177,22 @@ function DictionaryPopover({ word, onClose }) {
 }
 
 // ---------------------------------------------------------------------------
-// Clickable word span
+// Clickable word button – keyboard and mouse accessible
 // ---------------------------------------------------------------------------
 function ClickableWord({ word, onSelect }) {
   // Only make alphabetic words clickable (skip numbers, punctuation-only tokens)
   const isWord = /[a-zA-Z]/.test(word)
   if (!isWord) return <>{word}</>
   return (
-    <span
-      className="cursor-pointer hover:bg-koala-yellow/40 hover:rounded px-0.5 transition-colors"
+    <button
+      type="button"
+      className="cursor-pointer hover:bg-koala-yellow/40 hover:rounded px-0.5 transition-colors focus:outline-2 focus:outline-koala-teal focus:outline-offset-1 focus:rounded"
       onClick={() => onSelect(word)}
       title="Click for definition"
+      aria-label={`Get definition for ${word}`}
     >
       {word}
-    </span>
+    </button>
   )
 }
 
@@ -296,6 +330,7 @@ function TabBar({ active, onChange, puzzleLocked }) {
         return (
           <button
             key={t.id}
+            id={`tab-${t.id}`}
             role="tab"
             aria-selected={active === t.id}
             aria-controls={`panel-${t.id}`}
@@ -326,6 +361,9 @@ export default function App() {
   const [selectedStory, setSelectedStory] = useState(null)
   const [activeTab, setActiveTab] = useState('read')
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
+  // Track which tabs have been visited so we lazy-mount their content.
+  // 'read' is always pre-activated (it is the default landing tab).
+  const [activatedTabs, setActivatedTabs] = useState(() => new Set(['read']))
   const puzzleTabTimeoutRef = useRef(null)
 
   // Fetch Unsplash background based on current story theme
@@ -359,9 +397,20 @@ export default function App() {
     if (saved && ul.includes(saved)) setPuzzleUnlocked(true)
   }, [])
 
+  const handleTabChange = useCallback((tabId) => {
+    setActiveTab(tabId)
+    setActivatedTabs(prev => {
+      if (prev.has(tabId)) return prev
+      const next = new Set(prev)
+      next.add(tabId)
+      return next
+    })
+  }, [])
+
   const handleSelectStory = (story) => {
     setSelectedStory(story)
     setActiveTab('read')
+    setActivatedTabs(new Set(['read']))
     try { localStorage.setItem('littick_selected_story', story.id) } catch { /* localStorage unavailable – storage restriction */ }
     // Restore puzzle unlock state
     const ul = safeParseUnlocked()
@@ -378,7 +427,9 @@ export default function App() {
       } catch { /* localStorage unavailable – storage restriction */ }
     }
     // Auto-switch to puzzle tab after a short delay; store id so we can cancel it
-    puzzleTabTimeoutRef.current = setTimeout(() => setActiveTab('puzzle'), 1200)
+    puzzleTabTimeoutRef.current = setTimeout(() => {
+      handleTabChange('puzzle')
+    }, 1200)
   }
 
   const handleBackToMenu = () => {
@@ -386,6 +437,7 @@ export default function App() {
     clearTimeout(puzzleTabTimeoutRef.current)
     setSelectedStory(null)
     setActiveTab('read')
+    setActivatedTabs(new Set(['read']))
     setPuzzleUnlocked(false)
     try { localStorage.removeItem('littick_selected_story') } catch { /* localStorage unavailable – storage restriction */ }
   }
@@ -416,10 +468,12 @@ export default function App() {
           Pick a story to start reading! ⭐ All stories are curriculum-aligned for Year 2 students.
         </p>
 
-        {/* Discovery Hub on home screen */}
-        <div className="w-full max-w-2xl mt-10">
-          <DiscoveryHub storyTheme="children adventure animals" />
-        </div>
+        {/* Discovery Hub on home screen – not shown in test mode to avoid live fetches */}
+        {import.meta.env.MODE !== 'test' && (
+          <div className="w-full max-w-2xl mt-10">
+            <DiscoveryHub storyTheme="children adventure animals" />
+          </div>
+        )}
       </div>
     )
   }
@@ -470,54 +524,67 @@ export default function App() {
         {/* Tab navigation */}
         <TabBar
           active={activeTab}
-          onChange={setActiveTab}
+          onChange={handleTabChange}
           puzzleLocked={!puzzleUnlocked}
         />
 
-        {/* Tab panels */}
-        <div
-          id={`panel-${activeTab}`}
-          role="tabpanel"
-          className="rounded-3xl bg-white/70 backdrop-blur-sm border border-white/80 shadow-lg p-4 sm:p-6"
-        >
-          {activeTab === 'read' && (
-            <StoryReader story={selectedStory} />
-          )}
+        {/* Tab panels – all rendered with stable IDs so aria-controls always resolves.
+            Content is lazy-mounted (only inserted on first visit) to avoid firing
+            network requests for tabs the user hasn't opened yet. */}
+        <div className="relative">
+          {TABS.map(t => (
+            <div
+              key={t.id}
+              id={`panel-${t.id}`}
+              role="tabpanel"
+              aria-labelledby={`tab-${t.id}`}
+              hidden={activeTab !== t.id}
+              className="rounded-3xl bg-white/70 backdrop-blur-sm border border-white/80 shadow-lg p-4 sm:p-6"
+            >
+              {activatedTabs.has(t.id) && (
+                <>
+                  {t.id === 'read' && (
+                    <StoryReader story={selectedStory} />
+                  )}
 
-          {activeTab === 'timer' && (
-            <div className="flex flex-col items-center gap-4 py-2">
-              <p className="text-center font-bold text-koala-teal text-lg">
-                ⏱ Set your 15-minute reading timer!
-              </p>
-              <p className="text-sm text-gray-500 text-center max-w-xs">
-                Press <strong>Start</strong> and read your story. When the timer ends, a
-                special surprise awaits! 🎁
-              </p>
-              <Timer onTimerComplete={handleTimerComplete} />
-              {puzzleUnlocked && (
-                <div className="rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-3 text-center">
-                  <p className="text-sm font-bold text-yellow-700">
-                    🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
-                  </p>
-                </div>
+                  {t.id === 'timer' && (
+                    <div className="flex flex-col items-center gap-4 py-2">
+                      <p className="text-center font-bold text-koala-teal text-lg">
+                        ⏱ Set your 15-minute reading timer!
+                      </p>
+                      <p className="text-sm text-gray-500 text-center max-w-xs">
+                        Press <strong>Start</strong> and read your story. When the timer ends, a
+                        special surprise awaits! 🎁
+                      </p>
+                      <Timer onTimerComplete={handleTimerComplete} />
+                      {puzzleUnlocked && (
+                        <div className="rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-3 text-center">
+                          <p className="text-sm font-bold text-yellow-700">
+                            🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {t.id === 'retell' && (
+                    <Checklist storyId={selectedStory.id} />
+                  )}
+
+                  {t.id === 'puzzle' && (
+                    <PuzzleGame
+                      keywords={selectedStory.keywords}
+                      storyTitle={selectedStory.title}
+                    />
+                  )}
+
+                  {t.id === 'discover' && (
+                    <DiscoveryHub storyTheme={selectedStory.theme} />
+                  )}
+                </>
               )}
             </div>
-          )}
-
-          {activeTab === 'retell' && (
-            <Checklist storyId={selectedStory.id} />
-          )}
-
-          {activeTab === 'puzzle' && (
-            <PuzzleGame
-              keywords={selectedStory.keywords}
-              storyTitle={selectedStory.title}
-            />
-          )}
-
-          {activeTab === 'discover' && (
-            <DiscoveryHub storyTheme={selectedStory.theme} />
-          )}
+          ))}
         </div>
       </main>
 
