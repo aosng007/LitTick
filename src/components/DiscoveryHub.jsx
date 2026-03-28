@@ -49,6 +49,7 @@ function GutenbergReader({ book, onBack }) {
 
   useEffect(() => {
     if (!textUrl) { setLoading(false); return }
+    let ignore = false
     const controller = new AbortController()
     // Route through allorigins.win to avoid CORS restrictions on Gutenberg text files.
     // allorigins.win returns JSON: { contents: "<raw text>", status: {...} }
@@ -59,6 +60,7 @@ function GutenbergReader({ book, onBack }) {
         return r.json()
       })
       .then(data => {
+        if (ignore) return
         // `contents` is a UTF-8 string; any charset weirdness from .txt.utf-8
         // files is resolved by the JSON transport layer.
         const content = data.contents || ''
@@ -67,9 +69,10 @@ function GutenbergReader({ book, onBack }) {
         setLoading(false)
       })
       .catch(err => {
+        if (ignore) return
         if (err.name !== 'AbortError') { setText(null); setLoading(false) }
       })
-    return () => { controller.abort() }
+    return () => { ignore = true; controller.abort() }
   }, [textUrl])
 
   return (
