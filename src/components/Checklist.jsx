@@ -100,7 +100,7 @@ export default function Checklist({ storyId }) {
   useEffect(() => {
     if (!storyId) return
     try {
-      localStorage.setItem(storageKey(storyId), JSON.stringify({ checked, notes }))
+      localStorage.setItem(`littick_checklist_${storyId}`, JSON.stringify({ checked, notes }))
     } catch {
       // localStorage unavailable – storage restriction
     }

@@ -8,7 +8,6 @@ test('all localStorage.setItem calls use the littick_ prefix', async () => {
 
   for (const file of files) {
     const src = readFileSync(file, 'utf8')
-
     // Build a map of simple string constants defined in this file:
     //   const SOME_KEY = 'littick_example'
     const constKeyMap = new Map()

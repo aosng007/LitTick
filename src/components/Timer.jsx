@@ -284,7 +284,6 @@ export default function Timer({ onTimerComplete }) {
     }
     return () => clearInterval(intervalRef.current)
   }, [isTimerActive, hasFinished, onTimerComplete])
-
   // Dismiss confetti after 4 seconds automatically
   useEffect(() => {
     if (!showConfetti) return
