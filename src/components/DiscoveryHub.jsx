@@ -50,12 +50,18 @@ function GutenbergReader({ book, onBack }) {
   useEffect(() => {
     if (!textUrl) { setLoading(false); return }
     const controller = new AbortController()
-    fetch(textUrl, { signal: controller.signal })
+    // Route through allorigins.win to avoid CORS restrictions on Gutenberg text files.
+    // allorigins.win returns JSON: { contents: "<raw text>", status: {...} }
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(textUrl)}`
+    fetch(proxyUrl, { signal: controller.signal })
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.text()
+        return r.json()
       })
-      .then(content => {
+      .then(data => {
+        // `contents` is a UTF-8 string; any charset weirdness from .txt.utf-8
+        // files is resolved by the JSON transport layer.
+        const content = data.contents || ''
         // Show first ~2,000 characters so the view stays manageable
         setText(content.slice(0, 2000))
         setLoading(false)
@@ -94,8 +100,9 @@ function GutenbergReader({ book, onBack }) {
 
       {/* Book content */}
       {loading && (
-        <div className="flex items-center justify-center py-4 text-gray-400 text-sm animate-pulse">
-          📖 Loading book…
+        <div className="flex flex-col items-center justify-center gap-2 py-6" aria-live="polite" aria-label="Loading book content">
+          <div className="w-8 h-8 rounded-full border-4 border-amber-300 border-t-amber-600 animate-spin" />
+          <span className="text-sm font-semibold text-amber-700">Loading…</span>
         </div>
       )}
       {!loading && text && (
