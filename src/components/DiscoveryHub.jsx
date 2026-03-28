@@ -49,22 +49,21 @@ function GutenbergReader({ book, onBack }) {
 
   useEffect(() => {
     if (!textUrl) { setLoading(false); return }
-    let ignore = false
-    fetch(textUrl)
+    const controller = new AbortController()
+    fetch(textUrl, { signal: controller.signal })
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.text()
       })
       .then(content => {
-        if (ignore) return
         // Show first ~2,000 characters so the view stays manageable
         setText(content.slice(0, 2000))
         setLoading(false)
       })
-      .catch(() => {
-        if (!ignore) { setText(null); setLoading(false) }
+      .catch(err => {
+        if (err.name !== 'AbortError') { setText(null); setLoading(false) }
       })
-    return () => { ignore = true }
+    return () => { controller.abort() }
   }, [textUrl])
 
   return (
