@@ -58,6 +58,10 @@ const FINGERS = [
   },
 ]
 
+function storageKey(storyId) {
+  return `littick_checklist_${storyId}`
+}
+
 export default function Checklist({ storyId }) {
   const [checked, setChecked] = useState({})
   const [notes, setNotes] = useState({})
@@ -68,7 +72,17 @@ export default function Checklist({ storyId }) {
     if (!storyId) return
     let raw = null
     try {
-      raw = localStorage.getItem(`littick_checklist_${storyId}`)
+      raw = localStorage.getItem(storageKey(storyId))
+      // One-time migration: if new key is empty, check the legacy key
+      if (!raw) {
+        const legacyKey = `koalaread-checklist-${storyId}`
+        const legacyRaw = localStorage.getItem(legacyKey)
+        if (legacyRaw) {
+          raw = legacyRaw
+          try { localStorage.setItem(storageKey(storyId), legacyRaw) } catch { /* ignore */ }
+          try { localStorage.removeItem(legacyKey) } catch { /* ignore */ }
+        }
+      }
     } catch {
       // localStorage unavailable (e.g. private browsing SecurityError) – start fresh
       return

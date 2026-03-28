@@ -7,8 +7,36 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import Timer from './components/Timer'
 import Checklist from './components/Checklist'
 import PuzzleGame from './components/PuzzleGame'
+import Achievements from './components/Achievements'
 import DiscoveryHub from './components/DiscoveryHub'
 import stories from './content/Year2Texts.json'
+
+// ---------------------------------------------------------------------------
+// One-time migration: move legacy koalaread-* keys to littick_* equivalents
+// so returning users don't lose their progress after the rename.
+// Called at module load (not inside a component) so it runs exactly once.
+// ---------------------------------------------------------------------------
+function migrateStorageKeys() {
+  try {
+    // Selected story
+    if (!localStorage.getItem('littick_selected_story')) {
+      const legacy = localStorage.getItem('koalaread-story')
+      if (legacy) {
+        try { localStorage.setItem('littick_selected_story', legacy) } catch { /* ignore */ }
+        try { localStorage.removeItem('koalaread-story') } catch { /* ignore */ }
+      }
+    }
+    // Unlocked stories
+    if (!localStorage.getItem('littick_unlocked_stories')) {
+      const legacy = localStorage.getItem('koalaread-unlocked')
+      if (legacy) {
+        try { localStorage.setItem('littick_unlocked_stories', legacy) } catch { /* ignore */ }
+        try { localStorage.removeItem('koalaread-unlocked') } catch { /* ignore */ }
+      }
+    }
+  } catch { /* localStorage unavailable – skip migration */ }
+}
+migrateStorageKeys()
 
 // ---------------------------------------------------------------------------
 // Helper – safely parse the unlocked-stories array from localStorage
@@ -409,6 +437,7 @@ export default function App() {
   const [selectedStory, setSelectedStory] = useState(null)
   const [activeTab, setActiveTab] = useState('read')
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
+  const [showAchievements, setShowAchievements] = useState(false)
   // Track which tabs have been visited so we lazy-mount their content.
   // 'read' is always pre-activated (it is the default landing tab).
   const [activatedTabs, setActivatedTabs] = useState(() => new Set(['read']))
@@ -490,6 +519,11 @@ export default function App() {
     try { localStorage.removeItem('littick_selected_story') } catch { /* localStorage unavailable – storage restriction */ }
   }
 
+  // ── Achievements screen ───────────────────────────────────────────────────
+  if (showAchievements) {
+    return <Achievements onBack={() => setShowAchievements(false)} />
+  }
+
   // ── Story selection screen ────────────────────────────────────────────────
   if (!selectedStory) {
     return (
@@ -512,7 +546,16 @@ export default function App() {
           ))}
         </div>
 
-        <p className="mt-8 text-xs text-gray-400 text-center max-w-xs">
+        {/* Achievements link */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="mt-6 flex items-center gap-2 rounded-2xl bg-yellow-400/80 px-5 py-2.5 font-bold text-yellow-900 shadow hover:bg-yellow-400 active:scale-95 transition-all"
+          aria-label="View my achievements"
+        >
+          🏆 My Achievements
+        </button>
+
+        <p className="mt-4 text-xs text-gray-400 text-center max-w-xs">
           Pick a story to start reading! ⭐ All stories are curriculum-aligned for Year 2 students.
         </p>
 
@@ -588,7 +631,13 @@ export default function App() {
           </span>
         </div>
 
-        <div className="w-24" aria-hidden="true" /> {/* spacer */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="flex items-center gap-1.5 rounded-2xl bg-yellow-400/70 px-3 py-2 text-sm font-bold text-yellow-900 shadow hover:bg-yellow-400 active:scale-95 transition-all"
+          aria-label="View my achievements"
+        >
+          🏆
+        </button>
       </header>
 
       {/* Main card */}
