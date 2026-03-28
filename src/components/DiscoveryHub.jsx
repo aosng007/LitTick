@@ -8,6 +8,19 @@
 import { useState, useEffect } from 'react'
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+/** Returns `url` only if it is a valid http/https URL; otherwise null. */
+function safeHttpUrl(url) {
+  try {
+    const parsed = new URL(url || '')
+    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') ? url : null
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Gutenberg card – fetches real books from gutendex.com
 // ---------------------------------------------------------------------------
 function MagicBookshelf({ query = 'children adventure' }) {
@@ -191,11 +204,13 @@ function DailyNews({ topic = 'children education' }) {
       )}
       {NEWS_API_KEY && !loading && !error && (
         <ul className="flex flex-col gap-2">
-          {articles.map((article, i) => (
-            <li key={article.url || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
+          {articles.map((article, i) => {
+            const safeUrl = safeHttpUrl(article.url)
+            return (
+            <li key={safeUrl || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
               <a
-                href={article.url}
-                target="_blank"
+                href={safeUrl || '#'}
+                target={safeUrl ? '_blank' : undefined}
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm hover:bg-sky-100 transition-colors group"
               >
@@ -209,8 +224,9 @@ function DailyNews({ topic = 'children education' }) {
                 <span className="ml-auto text-sky-500 flex-shrink-0">→</span>
               </a>
             </li>
-          ))}
-        </ul>
+            )
+          })}
+        </ul> 
       )}
     </div>
   )
@@ -295,10 +311,12 @@ function NatureExplorer() {
       )}
       {!loading && !error && (
         <ul className="flex flex-col gap-2">
-          {items.map((item, i) => (
-            <li key={item.guid || item.link || i}>
+          {items.map((item, i) => {
+            const safeLink = safeHttpUrl(item.link)
+            return (
+            <li key={item.guid || safeLink || i}>
               <a
-                href={item.link}
+                href={safeLink || 'https://www.nationalgeographic.com/animals'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm hover:bg-green-100 transition-colors group"
@@ -322,7 +340,8 @@ function NatureExplorer() {
                 <span className="ml-auto text-green-500 flex-shrink-0">→</span>
               </a>
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>

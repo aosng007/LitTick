@@ -353,6 +353,7 @@ function TabBar({ active, onChange, puzzleLocked }) {
             role="tab"
             aria-selected={active === t.id}
             aria-controls={`panel-${t.id}`}
+            aria-label={isLocked ? `${t.label} (locked – finish your 15-minute read to unlock)` : t.label}
             onClick={() => !isLocked && onChange(t.id)}
             disabled={isLocked}
             title={isLocked ? 'Finish your 15-minute read to unlock!' : undefined}
