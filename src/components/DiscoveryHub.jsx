@@ -250,20 +250,46 @@ function stripHtml(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html')
     return doc.body.textContent || ''
   } catch {
-    // DOMParser unavailable – return empty string rather than risk partial sanitization.
-    return ''
+    // DOMParser unavailable or parsing failed – fall back to the original text so
+    // the Reading View still shows content. It will be rendered as escaped plain text.
+    return typeof html === 'string' ? html : String(html)
   }
+}
+
+/**
+ * Deterministically hash a string into a short base-36 ID fragment.
+ * Used when an RSS item is missing both guid and link to avoid ID collisions.
+ */
+function hashString(value) {
+  let hash = 0
+  if (!value) return '0'
+  for (let i = 0; i < value.length; i += 1) {
+    const chr = value.charCodeAt(i)
+    hash = (hash << 5) - hash + chr
+    hash |= 0 // Convert to 32-bit integer
+  }
+  return Math.abs(hash >>> 0).toString(36)
 }
 
 /**
  * Returns a stable, storage-safe ID for a nature story item.
  * Fallback stories already have a clean `id` field.
  * For live RSS items we derive one from the guid or link.
+ * If both guid and link are missing, we fall back to a hashed representation
+ * of the item (preferably its title) to avoid ID collisions.
  */
 function getNatureStoryId(item) {
   if (item.id) return item.id
-  const raw = item.guid || item.link || ''
-  return 'nature-' + raw.replace(/[^a-zA-Z0-9]/g, '-').slice(-MAX_ID_SUFFIX_LENGTH)
+  const raw = item.guid || item.link
+  if (raw) {
+    return 'nature-' + raw.replace(/[^a-zA-Z0-9]/g, '-').slice(-MAX_ID_SUFFIX_LENGTH)
+  }
+  // Fallback when both guid and link are unavailable.
+  const title = typeof item.title === 'string' ? item.title : ''
+  const serialized = title || (() => {
+    try { return JSON.stringify(item) } catch { return '' }
+  })()
+  return 'nature-' + hashString(serialized).slice(0, MAX_ID_SUFFIX_LENGTH)
 }
 
 // ---------------------------------------------------------------------------
@@ -311,8 +337,8 @@ function ReadingTimer() {
         <span className="font-bold text-koala-teal text-base">15-Minute Reading Timer</span>
       </div>
 
-      <div className="relative w-28 h-28" aria-hidden="true">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96">
+      <div className="relative w-28 h-28">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
           <circle cx="48" cy="48" r={r} fill="none" stroke="#E5E7EB" strokeWidth="6" />
           <circle
             cx="48" cy="48" r={r}
