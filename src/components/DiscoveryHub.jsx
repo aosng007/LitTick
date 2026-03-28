@@ -41,7 +41,7 @@ const FALLBACK_NATURE_STORIES = [
 // ---------------------------------------------------------------------------
 function MagicBookshelf({ query = 'children' }) {
   const [books, setBooks] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -200,7 +200,7 @@ function DailyNews({ topic = 'children education' }) {
       {NEWS_API_KEY && error && (
         <p className="text-xs text-red-400 text-center py-2">{error}</p>
       )}
-      {NEWS_API_KEY && !loading && !error && (
+      {NEWS_API_KEY && !loading && !error && articles.length > 0 && (
         <ul className="flex flex-col gap-2">
           {articles.map((article, i) => (
             <li key={article.url || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
