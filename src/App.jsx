@@ -28,8 +28,8 @@ function safeParseUnlocked() {
 // ---------------------------------------------------------------------------
 const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || ''
 
-/** Validates that a URL from the Unsplash API is a well-formed https URL. */
-function safeUnsplashUrl(url) {
+/** Validates that a URL is a well-formed https URL; returns normalized href or null. */
+function safeHttpsUrl(url) {
   try {
     const parsed = new URL(url || '')
     return parsed.protocol === 'https:' ? parsed.href : null
@@ -61,9 +61,9 @@ function useStoryBackground(theme) {
         if (canceled || controller.signal.aborted) return
         if (data && data.urls && data.urls.regular) {
           // Validate all URLs from the external API response before using them
-          const bgUrl = safeUnsplashUrl(data.urls.regular)
-          const profileUrl = safeUnsplashUrl(data.user?.links?.html) || 'https://unsplash.com'
-          const downloadLocation = safeUnsplashUrl(data.links?.download_location)
+          const bgUrl = safeHttpsUrl(data.urls.regular)
+          const profileUrl = safeHttpsUrl(data.user?.links?.html) || 'https://unsplash.com'
+          const downloadLocation = safeHttpsUrl(data.links?.download_location)
           if (!bgUrl) {
             setBgData(null)
             return
@@ -170,7 +170,9 @@ function DictionaryPopover({ word, onClose }) {
   const firstDefinition = firstMeaning?.definitions?.[0]?.definition
   const partOfSpeech = firstMeaning?.partOfSpeech
   const phonetic = data?.phonetic || data?.phonetics?.find(p => p.text)?.text
-  const audioUrl = data?.phonetics?.find(p => p.audio)?.audio
+  const rawAudioUrl = data?.phonetics?.find(p => p.audio)?.audio
+  // Validate audio URL – must be a well-formed https URL to avoid mixed-content failures
+  const audioUrl = safeHttpsUrl(rawAudioUrl)
 
   return (
     <div

@@ -208,21 +208,34 @@ function DailyNews({ topic = 'children education' }) {
             const safeUrl = safeHttpUrl(article.url)
             return (
             <li key={safeUrl || `${article.source?.name || 'unknown'}-${article.publishedAt || article.title}-${i}`}>
-              <a
-                href={safeUrl || '#'}
-                target={safeUrl ? '_blank' : undefined}
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm hover:bg-sky-100 transition-colors group"
-              >
-                <span className="text-lg flex-shrink-0">📄</span>
-                <div className="min-w-0">
-                  <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-sky-700">
-                    {article.title}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
+              {safeUrl ? (
+                <a
+                  href={safeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm hover:bg-sky-100 transition-colors group"
+                >
+                  <span className="text-lg flex-shrink-0">📄</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-800 line-clamp-2 group-hover:text-sky-700">
+                      {article.title}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
+                  </div>
+                  <span className="ml-auto text-sky-500 flex-shrink-0">→</span>
+                </a>
+              ) : (
+                <div
+                  className="flex items-center gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3 py-2 text-sm opacity-60 cursor-not-allowed"
+                  aria-disabled="true"
+                >
+                  <span className="text-lg flex-shrink-0">📄</span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-gray-800 line-clamp-2">{article.title}</p>
+                    <p className="text-xs text-gray-500 truncate">{article.source?.name}</p>
+                  </div>
                 </div>
-                <span className="ml-auto text-sky-500 flex-shrink-0">→</span>
-              </a>
+              )}
             </li>
             )
           })}
@@ -321,9 +334,9 @@ function NatureExplorer() {
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2 text-sm hover:bg-green-100 transition-colors group"
               >
-                {item.thumbnail ? (
+                {safeHttpUrl(item.thumbnail) ? (
                   <img
-                    src={item.thumbnail}
+                    src={safeHttpUrl(item.thumbnail)}
                     alt=""
                     className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                     aria-hidden="true"
