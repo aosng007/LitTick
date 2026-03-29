@@ -70,16 +70,58 @@ function sanitizeHtml(html, baseUrl) {
       }
     })
   })
-  // Rewrite relative image src attributes to absolute URLs so that
-  // illustrations load correctly when the HTML is injected into our app.
+  // Rewrite image src attributes to absolute URLs.
+  // Handles: (a) normal relative paths, (b) EPUB internal 'image:…' labels.
   if (baseUrl) {
-    doc.querySelectorAll('img[src]').forEach(img => {
+    doc.querySelectorAll('img').forEach(img => {
       const src = img.getAttribute('src')
-      if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith('data:')) {
+      if (!src) return
+      // Already absolute HTTP/HTTPS or data URI – nothing to do
+      if (src.startsWith('https://') || src.startsWith('http://') || src.startsWith('//') || src.startsWith('data:')) return
+
+      // ── Case 1: Normal relative path (no scheme separator) ──────────────────
+      if (!src.includes(':')) {
         try {
           img.setAttribute('src', new URL(src, baseUrl).href)
-        } catch { /* ignore malformed src values */ }
+          return
+        } catch { /* fall through */ }
       }
+
+      // ── Case 2: EPUB internal label, e.g. 'image:image.illustration-1' ──────
+      // Strategy A: use the href of a wrapping <a> tag
+      const anchor = img.closest('a[href]')
+      if (anchor) {
+        const href = anchor.getAttribute('href') || ''
+        const hrefNorm = href.replace(/\s/g, '').toLowerCase()
+        if (!hrefNorm.startsWith('javascript:') && !hrefNorm.startsWith('data:') && !hrefNorm.startsWith('vbscript:')) {
+          try {
+            img.setAttribute('src', new URL(href, baseUrl).href)
+            return
+          } catch { /* fall through */ }
+        }
+      }
+
+      // Strategy B: derive filename from the label, id, or alt text, then point
+      // to the /images/ folder inside the book's /text/ directory.
+      // e.g. 'image:image.illustration-1' → filename 'illustration-1'
+      const afterColon = src.slice(src.indexOf(':') + 1)
+      const dotIdx = afterColon.indexOf('.')
+      const fromLabel = dotIdx >= 0 ? afterColon.slice(dotIdx + 1) : afterColon
+      const fromId    = img.getAttribute('id') || ''
+      const fromAlt   = (img.getAttribute('alt') || '').replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase()
+      const filename  = fromId || fromLabel || fromAlt
+      if (filename) {
+        try {
+          // Derive the /text/ base directory from the singlePageUrl
+          // e.g. …/text/single-page → new URL('.', …) → …/text/
+          const textDirUrl = new URL('.', baseUrl).href
+          img.setAttribute('src', `${textDirUrl}images/${filename}.jpg`)
+          return
+        } catch { /* fall through */ }
+      }
+
+      // ── Fallback: hide the image to avoid a broken icon ─────────────────────
+      img.style.display = 'none'
     })
   }
   return doc.body.innerHTML
@@ -148,6 +190,18 @@ export default function StandardEbooksReader({ book, onBack }) {
       if (!Number.isNaN(pos) && pos >= 0) containerRef.current.scrollTop = pos
     }
   }, [htmlContent, book.id])
+
+  // Attach onerror handlers to every <img> so that images that still fail to
+  // load (e.g. due to CORS or an unresolvable path) are hidden rather than
+  // showing the browser's broken-image icon.
+  useEffect(() => {
+    if (!htmlContent || !containerRef.current) return
+    containerRef.current.querySelectorAll('img').forEach(img => {
+      if (!img.onerror) {
+        img.onerror = () => { img.style.display = 'none' }
+      }
+    })
+  }, [htmlContent])
 
   const handleSaveProgress = useCallback(() => {
     const scrollPos = String(containerRef.current?.scrollTop ?? 0)
