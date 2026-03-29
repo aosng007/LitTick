@@ -46,8 +46,10 @@ function saveBookmark(bookId, scrollPos) {
 // ---------------------------------------------------------------------------
 // Sanitize fetched HTML before injection
 // Removes <script> tags, inline event handlers (on*), and javascript: URLs.
+// Also rewrites relative image src attributes (e.g. ../images/foo.jpg) to
+// absolute URLs using the provided baseUrl so that illustrations load correctly.
 // ---------------------------------------------------------------------------
-function sanitizeHtml(html) {
+function sanitizeHtml(html, baseUrl) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   // Remove script, style, link, and top-level site-chrome elements.
   // Use child combinators (body > …) so that book-internal <nav> (e.g. ToC),
@@ -68,6 +70,18 @@ function sanitizeHtml(html) {
       }
     })
   })
+  // Rewrite relative image src attributes to absolute URLs so that
+  // illustrations load correctly when the HTML is injected into our app.
+  if (baseUrl) {
+    doc.querySelectorAll('img[src]').forEach(img => {
+      const src = img.getAttribute('src')
+      if (src && !src.startsWith('http') && !src.startsWith('//') && !src.startsWith('data:')) {
+        try {
+          img.setAttribute('src', new URL(src, baseUrl).href)
+        } catch { /* ignore malformed src values */ }
+      }
+    })
+  }
   return doc.body.innerHTML
 }
 
@@ -113,7 +127,7 @@ export default function StandardEbooksReader({ book, onBack }) {
         return res.text()
       })
       .then(html => {
-        setHtmlContent(sanitizeHtml(html))
+        setHtmlContent(sanitizeHtml(html, singlePageUrl))
         setLoading(false)
       })
       .catch(err => {

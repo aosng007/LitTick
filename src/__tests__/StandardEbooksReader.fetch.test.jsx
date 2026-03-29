@@ -196,4 +196,32 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
     expect(container.querySelector('#chapter-footer')).not.toBeNull()
     expect(container.innerHTML).toContain('Book content.')
   })
+
+  test('rewrites relative ../images/* src to absolute standardebooks.org URL', async () => {
+    const htmlWithImages =
+      '<p>Look at this!</p>' +
+      '<img src="../images/chapter-1.jpg" alt="Chapter 1 illustration"/>' +
+      '<img src="../images/chapter-2.png" alt="Chapter 2 illustration"/>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithImages) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    const imgs = container.querySelectorAll('img')
+    expect(imgs).toHaveLength(2)
+    // Relative paths must be resolved to absolute standardebooks.org URLs
+    expect(imgs[0].getAttribute('src')).toBe(
+      `${TEST_BOOK.url}/images/chapter-1.jpg`
+    )
+    expect(imgs[1].getAttribute('src')).toBe(
+      `${TEST_BOOK.url}/images/chapter-2.png`
+    )
+    // Original relative paths must not survive
+    expect(container.innerHTML).not.toContain('../images/')
+  })
 })

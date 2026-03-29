@@ -99,4 +99,14 @@
   .reading-container article {
     margin-bottom: 2em;
   }
+
+  .reading-container img {
+    display: block;
+    max-width: 90%;
+    height: auto;
+    margin: 30px auto;
+    border: 5px solid #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border-radius: 8px;
+  }
 }
