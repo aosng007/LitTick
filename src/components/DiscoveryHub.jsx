@@ -1,79 +1,28 @@
 /**
  * DiscoveryHub.jsx
- * Discovery Hub – showcases three external content sources:
- *   1. Magic Bookshelf  (Project Gutenberg via gutendex.com)
- *   2. Daily News       (NewsAPI – requires API key)
- *   3. Nature Explorer  (National Geographic RSS via rss2json, with local fallback)
+ * Discovery Hub – showcases three content sources:
+ *   1. Standard Ebooks Shelf  (5 hardcoded Year 2 classics, rendered via epubjs)
+ *   2. Daily News             (NewsAPI – requires API key)
+ *   3. Nature Explorer        (National Geographic RSS via rss2json, with local fallback)
  *
- * All content is rendered within the app UI. No <a> tags navigate away from the app.
+ * Primary reading and exploration experiences are rendered within the app UI.
  */
 import { useState, useEffect, useRef } from 'react'
 import Checklist from './Checklist'
 import { TOTAL_SECONDS } from './Timer'
 import NATURE_STORIES from '../content/natureData'
-import ReadingView from './ReadingView'
+import StandardEbooksReader from './StandardEbooksReader'
+import { STANDARD_EBOOKS_CLASSICS } from '../content/StandardEbooksClassics'
 
 // ---------------------------------------------------------------------------
-// GutenbergReader – inline reading view for a Gutenberg book (iframe embed)
+// Standard Ebooks Shelf – displays 5 hardcoded Year 2 classics
 // ---------------------------------------------------------------------------
-function GutenbergReader({ book, onBack }) {
-  return (
-    <ReadingView book={book} onBack={onBack}>
-      <div className="rounded-2xl bg-white/90 border border-koala-green/20 p-4 shadow-sm">
-        <ReadingTimer />
-      </div>
-    </ReadingView>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Gutenberg card – fetches real books from gutendex.com
-// ---------------------------------------------------------------------------
-function MagicBookshelf() {
-  const [books, setBooks] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+function StandardEbooksShelf() {
   const [selectedBook, setSelectedBook] = useState(null)
 
-  useEffect(() => {
-    let ignore = false
-    const controller = new AbortController()
-
-    setLoading(true)
-    setError(null)
-    setBooks([])
-
-    fetch(
-      'https://gutendex.com/books?topic=children&languages=en',
-      { signal: controller.signal }
-    )
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(data => {
-        if (ignore) return
-        setBooks((data.results || []).slice(0, 6))
-        setLoading(false)
-      })
-      .catch(err => {
-        if (ignore) return
-        if (err && err.name === 'AbortError') return
-        setBooks([])
-        setError('Could not load books. Please try again later.')
-        setLoading(false)
-      })
-
-    return () => {
-      ignore = true
-      controller.abort()
-    }
-  }, [])
-
-  // Show inline reader when a book is selected
   if (selectedBook) {
     return (
-      <GutenbergReader
+      <StandardEbooksReader
         book={selectedBook}
         onBack={() => setSelectedBook(null)}
       />
@@ -84,58 +33,33 @@ function MagicBookshelf() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <span className="text-2xl">📚</span>
-        <h3 className="font-extrabold text-koala-teal text-base">Magic Bookshelf</h3>
-        <span className="text-xs text-gray-400 ml-auto">Project Gutenberg</span>
+        <h3 className="font-extrabold text-koala-teal text-base">Classic Bookshelf</h3>
+        <span className="text-xs text-gray-400 ml-auto">Standard Ebooks</span>
       </div>
-      {loading && (
-        <div className="flex items-center justify-center py-4 text-gray-400 text-sm animate-pulse">
-          📖 Loading books…
-        </div>
-      )}
-      {error && (
-        <p className="text-xs text-red-400 text-center py-2">{error}</p>
-      )}
-      {!loading && !error && books.length === 0 && (
-        <p className="text-xs text-gray-400 text-center py-2">No books found.</p>
-      )}
-      {!loading && !error && books.length > 0 && (
-        <ul className="grid grid-cols-2 gap-2">
-          {books.map(book => {
-            const coverUrl = (() => {
-              try {
-                const raw = book.formats?.['image/jpeg'] || ''
-                const parsed = new URL(raw)
-                return parsed.protocol === 'https:' ? parsed.href : null
-              } catch {
-                return null
-              }
-            })()
-            return (
-              <li key={book.id}>
-                <button
-                  onClick={() => setSelectedBook(book)}
-                  className="w-full flex flex-col items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm hover:bg-amber-100 hover:border-amber-400 hover:shadow-md active:scale-[0.98] transition-all text-center"
-                  aria-label={`Read ${book.title}`}
-                >
-                  {coverUrl ? (
-                    <img
-                      src={coverUrl}
-                      alt={`Cover of ${book.title}`}
-                      className="w-16 h-[88px] object-cover rounded shadow"
-                    />
-                  ) : (
-                    <span className="text-4xl" aria-hidden="true">📖</span>
-                  )}
-                  <p className="font-bold text-gray-800 line-clamp-2 text-xs leading-snug">
-                    {book.title}
-                  </p>
-                  <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">▶ Read</p>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {STANDARD_EBOOKS_CLASSICS.map(book => (
+          <li key={book.id}>
+            <button
+              onClick={() => setSelectedBook(book)}
+              className="w-full flex flex-col items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm hover:bg-amber-100 hover:border-amber-400 hover:shadow-md active:scale-[0.98] transition-all text-center"
+              aria-label={`Read ${book.title}`}
+            >
+              <span
+                className="text-4xl w-16 h-[88px] flex items-center justify-center rounded shadow"
+                style={{ background: book.coverColor + '33' }}
+                aria-hidden="true"
+              >
+                {book.emoji}
+              </span>
+              <p className="font-bold text-gray-800 line-clamp-2 text-xs leading-snug">
+                {book.title}
+              </p>
+              <p className="text-xs text-gray-500 truncate w-full">{book.author}</p>
+              <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">▶ Read</p>
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }
@@ -596,9 +520,9 @@ export default function DiscoveryHub({ storyTheme = 'children' }) {
       </div>
 
       <div className="grid grid-cols-1 gap-5">
-        {/* Magic Bookshelf */}
+        {/* Standard Ebooks Classic Bookshelf */}
         <div className="rounded-3xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 p-4 shadow-sm">
-          <MagicBookshelf />
+          <StandardEbooksShelf />
         </div>
 
         {/* Daily News */}

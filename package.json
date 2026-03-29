@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "epubjs": "^0.3.93",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
