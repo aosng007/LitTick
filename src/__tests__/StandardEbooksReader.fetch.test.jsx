@@ -148,4 +148,40 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
     const btn = screen.getByRole('button', { name: /save reading progress/i })
     expect(btn).toBeDisabled()
   })
+
+  test('strips <nav> elements from fetched HTML before rendering', async () => {
+    const htmlWithNav = '<nav><a href="/toc">Table of Contents</a></nav><p>Chapter text.</p>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithNav) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    expect(container.querySelector('nav')).toBeNull()
+    expect(container.innerHTML).toContain('Chapter text.')
+  })
+
+  test('strips <header> and <footer> elements from fetched HTML before rendering', async () => {
+    const htmlWithChrome =
+      '<header><nav>Site Nav</nav></header>' +
+      '<main><p>Book content.</p></main>' +
+      '<footer>Site footer</footer>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithChrome) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    expect(container.querySelector('header')).toBeNull()
+    expect(container.querySelector('footer')).toBeNull()
+    expect(container.innerHTML).toContain('Book content.')
+  })
 })

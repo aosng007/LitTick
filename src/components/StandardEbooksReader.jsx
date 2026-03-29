@@ -11,7 +11,10 @@
  * Features:
  *   • fetch() retrieves the book HTML from <bookUrl>/text/single-page
  *   • dangerouslySetInnerHTML injects the text into the ReadingContainer
- *   • Large fonts and clear spacing are applied for young readers
+ *   • sanitizeHtml strips scripts, styles, and website-chrome elements
+ *     (nav, header, footer) then removes inline event handlers / JS URIs
+ *   • Book typography is provided by the .reading-container CSS class in
+ *     index.css (Georgia serif, heading sizes, paragraph indentation)
  *   • Bookmark system: "Save Progress" stores the scroll position in
  *     localStorage under the key `littick_bookmark_<bookId>` and restores
  *     it automatically the next time the same book is opened.
@@ -46,8 +49,8 @@ function saveBookmark(bookId, scrollPos) {
 // ---------------------------------------------------------------------------
 function sanitizeHtml(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  // Remove script, style and link elements wholesale
-  doc.querySelectorAll('script, style, link').forEach(el => el.remove())
+  // Remove script, style, link, and website-chrome elements wholesale
+  doc.querySelectorAll('script, style, link, nav, header, footer').forEach(el => el.remove())
   // Strip inline event handlers and dangerous URIs from every element.
   // Normalize: remove whitespace and lowercase to catch obfuscated variants
   // (DOMParser already decodes HTML entities, e.g. &#106;avascript: → javascript:)

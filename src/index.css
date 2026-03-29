@@ -41,3 +41,62 @@
   80%  { opacity: 1; }
   100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
 }
+
+/* ── ReadingContainer: book typography for injected Standard Ebooks HTML ── */
+@layer components {
+  .reading-container {
+    color: #1a1a1a;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  .reading-container h1,
+  .reading-container h2,
+  .reading-container h3,
+  .reading-container h4,
+  .reading-container h5,
+  .reading-container h6 {
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-weight: 700;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+    line-height: 1.3;
+    color: #2d2d2d;
+  }
+
+  .reading-container h1 { font-size: 1.6em; }
+  .reading-container h2 { font-size: 1.35em; }
+  .reading-container h3 { font-size: 1.15em; }
+
+  .reading-container p {
+    margin-bottom: 0.75em;
+    text-indent: 1.5em;
+  }
+
+  .reading-container p:first-of-type,
+  .reading-container h1 + p,
+  .reading-container h2 + p,
+  .reading-container h3 + p {
+    text-indent: 0;
+  }
+
+  .reading-container blockquote {
+    border-left: 4px solid #d4a853;
+    padding-left: 1em;
+    margin: 1em 0 1em 1em;
+    font-style: italic;
+    color: #555;
+  }
+
+  .reading-container em { font-style: italic; }
+  .reading-container strong { font-weight: 700; }
+
+  .reading-container a {
+    color: #3D9A8B;
+    text-decoration: underline;
+  }
+
+  .reading-container section,
+  .reading-container article {
+    margin-bottom: 2em;
+  }
+}
