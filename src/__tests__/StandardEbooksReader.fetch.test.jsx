@@ -149,8 +149,11 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
     expect(btn).toBeDisabled()
   })
 
-  test('strips <nav> elements from fetched HTML before rendering', async () => {
-    const htmlWithNav = '<nav><a href="/toc">Table of Contents</a></nav><p>Chapter text.</p>'
+  test('strips top-level <nav> from fetched HTML but preserves in-book nav', async () => {
+    // body > nav is site chrome; nav nested inside <main> is in-book content (e.g. ToC)
+    const htmlWithNav =
+      '<nav id="site-nav"><a href="/">Home</a></nav>' +
+      '<main><nav id="toc"><a href="#ch1">Chapter 1</a></nav><p>Chapter text.</p></main>'
     global.fetch = vi.fn(() =>
       Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithNav) })
     )
@@ -161,15 +164,20 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
       expect(screen.getByTestId('reading-container')).toBeInTheDocument()
     })
     const container = screen.getByTestId('reading-container')
-    expect(container.querySelector('nav')).toBeNull()
+    // Top-level site nav must be gone
+    expect(container.querySelector('#site-nav')).toBeNull()
+    // In-book nav (nested inside main) must be preserved
+    expect(container.querySelector('#toc')).not.toBeNull()
     expect(container.innerHTML).toContain('Chapter text.')
   })
 
-  test('strips <header> and <footer> elements from fetched HTML before rendering', async () => {
+  test('strips top-level <header>/<footer> but preserves nested in-book elements', async () => {
     const htmlWithChrome =
-      '<header><nav>Site Nav</nav></header>' +
-      '<main><p>Book content.</p></main>' +
-      '<footer>Site footer</footer>'
+      '<header id="site-header"><nav>Site Nav</nav></header>' +
+      '<main><header id="chapter-header"><h2>Chapter One</h2></header>' +
+      '<p>Book content.</p>' +
+      '<footer id="chapter-footer">— End of chapter —</footer></main>' +
+      '<footer id="site-footer">Site footer</footer>'
     global.fetch = vi.fn(() =>
       Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithChrome) })
     )
@@ -180,8 +188,12 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
       expect(screen.getByTestId('reading-container')).toBeInTheDocument()
     })
     const container = screen.getByTestId('reading-container')
-    expect(container.querySelector('header')).toBeNull()
-    expect(container.querySelector('footer')).toBeNull()
+    // Top-level site chrome must be gone
+    expect(container.querySelector('#site-header')).toBeNull()
+    expect(container.querySelector('#site-footer')).toBeNull()
+    // In-book nested header/footer must survive
+    expect(container.querySelector('#chapter-header')).not.toBeNull()
+    expect(container.querySelector('#chapter-footer')).not.toBeNull()
     expect(container.innerHTML).toContain('Book content.')
   })
 })
