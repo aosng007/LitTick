@@ -642,17 +642,28 @@ export default function App() {
 
       {/* Main card */}
       <main className="w-full max-w-2xl flex flex-col gap-4">
-        {/* Persistent timer – always visible at the top of the reading session */}
-        <div className="sticky top-2 z-20 rounded-3xl bg-white/80 backdrop-blur-sm border border-white/80 shadow-lg p-4 sm:p-5">
+        {/* Fixed timer overlay – always visible above the reading container */}
+        <div
+          style={{
+            position: 'fixed',
+            top: '10px',
+            right: '10px',
+            zIndex: 10000,
+            backgroundColor: '#FFD700',
+            borderRadius: '16px',
+            padding: '12px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+          }}
+        >
           <Timer onTimerComplete={handleTimerComplete} />
-          {puzzleUnlocked && (
-            <div className="mt-3 rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-2 text-center">
-              <p className="text-sm font-bold text-yellow-700">
-                🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
-              </p>
-            </div>
-          )}
         </div>
+        {puzzleUnlocked && (
+          <div className="rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-2 text-center">
+            <p className="text-sm font-bold text-yellow-700">
+              🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
+            </p>
+          </div>
+        )}
 
         {/* Tab navigation */}
         <TabBar
