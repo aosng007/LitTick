@@ -5,7 +5,7 @@
  *   2. Daily News             (NewsAPI – requires API key)
  *   3. Nature Explorer        (National Geographic RSS via rss2json, with local fallback)
  *
- * All content is rendered within the app UI. No <a> tags navigate away from the app.
+ * Primary reading and exploration experiences are rendered within the app UI.
  */
 import { useState, useEffect, useRef } from 'react'
 import Checklist from './Checklist'

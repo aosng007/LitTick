@@ -15,14 +15,14 @@
  */
 export const STANDARD_EBOOKS_CLASSICS = [
   {
-    id: 'peter-rabbit',
-    title: 'The Tale of Peter Rabbit',
-    author: 'Beatrix Potter',
-    emoji: '🐰',
+    id: 'peter-and-wendy',
+    title: 'Peter and Wendy',
+    author: 'J. M. Barrie',
+    emoji: '🧚',
     coverColor: '#5BAD8F',
-    url: 'https://standardebooks.org/ebooks/beatrix-potter/the-tale-of-peter-rabbit',
+    url: 'https://standardebooks.org/ebooks/j-m-barrie/peter-and-wendy',
     epubUrl:
-      'https://standardebooks.org/ebooks/beatrix-potter/the-tale-of-peter-rabbit/downloads/beatrix-potter_the-tale-of-peter-rabbit.epub',
+      'https://standardebooks.org/ebooks/j-m-barrie/peter-and-wendy/downloads/j-m-barrie_peter-and-wendy.epub',
   },
   {
     id: 'secret-garden',
@@ -40,9 +40,9 @@ export const STANDARD_EBOOKS_CLASSICS = [
     author: 'Aesop, translated by V. S. Vernon Jones',
     emoji: '🦊',
     coverColor: '#F59E0B',
-    url: 'https://standardebooks.org/ebooks/aesop/aesops-fables/v-s-vernon-jones',
+    url: 'https://standardebooks.org/ebooks/aesop/fables/v-s-vernon-jones',
     epubUrl:
-      'https://standardebooks.org/ebooks/aesop/aesops-fables/v-s-vernon-jones/downloads/aesop_aesops-fables_v-s-vernon-jones.epub',
+      'https://standardebooks.org/ebooks/aesop/fables/v-s-vernon-jones/downloads/aesop_fables_v-s-vernon-jones.epub',
   },
   {
     id: 'alice-wonderland',
@@ -50,9 +50,9 @@ export const STANDARD_EBOOKS_CLASSICS = [
     author: 'Lewis Carroll',
     emoji: '🐇',
     coverColor: '#3D4F8B',
-    url: 'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland',
+    url: 'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel',
     epubUrl:
-      'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/downloads/lewis-carroll_alices-adventures-in-wonderland.epub',
+      'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub',
   },
   {
     id: 'wizard-of-oz',

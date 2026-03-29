@@ -28,6 +28,15 @@ vi.mock('epubjs', () => {
 })
 
 describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
+  let originalFetch
+
+  beforeEach(() => {
+    originalFetch = global.fetch
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
+  })
   test('renders the Classic Bookshelf section heading', () => {
     render(<DiscoveryHub />)
     expect(screen.getByText('Classic Bookshelf')).toBeInTheDocument()
@@ -35,7 +44,7 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
 
   test('renders all 5 Standard Ebooks classics', () => {
     render(<DiscoveryHub />)
-    expect(screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Read Peter and Wendy/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Read The Secret Garden/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Read Aesop's Fables/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Read Alice's Adventures in Wonderland/i })).toBeInTheDocument()
@@ -45,17 +54,17 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
   test('clicking a book card opens the StandardEbooksReader with correct title', () => {
     render(<DiscoveryHub />)
 
-    const readBtn = screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i })
+    const readBtn = screen.getByRole('button', { name: /Read Peter and Wendy/i })
     fireEvent.click(readBtn)
 
-    expect(screen.getByText('The Tale of Peter Rabbit')).toBeInTheDocument()
-    expect(screen.getByText('Beatrix Potter')).toBeInTheDocument()
+    expect(screen.getByText('Peter and Wendy')).toBeInTheDocument()
+    expect(screen.getByText('J. M. Barrie')).toBeInTheDocument()
   })
 
   test('opens reader without a raw gutenberg.org iframe', () => {
     render(<DiscoveryHub />)
 
-    const readBtn = screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i })
+    const readBtn = screen.getByRole('button', { name: /Read Peter and Wendy/i })
     fireEvent.click(readBtn)
 
     // There must be no iframe pointing to gutenberg.org
@@ -68,7 +77,6 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
 
   test('does not call gutendex.com or allorigins.win when a book is opened', async () => {
     const calledUrls = []
-    const originalFetch = global.fetch
     global.fetch = (url) => {
       calledUrls.push(url)
       return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })
@@ -76,7 +84,7 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
 
     render(<DiscoveryHub />)
 
-    const readBtn = screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i })
+    const readBtn = screen.getByRole('button', { name: /Read Peter and Wendy/i })
     fireEvent.click(readBtn)
 
     // No requests to old Gutenberg sources should be made
@@ -88,14 +96,12 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
     })
     expect(gutendexCall).toBeUndefined()
     expect(proxyCall).toBeUndefined()
-
-    global.fetch = originalFetch
   })
 
   test('shows a Save Progress bookmark button in the reader', () => {
     render(<DiscoveryHub />)
 
-    const readBtn = screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i })
+    const readBtn = screen.getByRole('button', { name: /Read Peter and Wendy/i })
     fireEvent.click(readBtn)
 
     expect(
@@ -106,8 +112,8 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
   test('back button returns to the bookshelf from the reader', () => {
     render(<DiscoveryHub />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Read The Tale of Peter Rabbit/i }))
-    expect(screen.getByText('The Tale of Peter Rabbit')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Read Peter and Wendy/i }))
+    expect(screen.getByText('Peter and Wendy')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /back to bookshelf/i }))
 

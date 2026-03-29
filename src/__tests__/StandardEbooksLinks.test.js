@@ -45,11 +45,11 @@ describe('STANDARD_EBOOKS_CLASSICS data', () => {
     }
   })
 
-  test('contains The Tale of Peter Rabbit', () => {
-    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'peter-rabbit')
+  test('contains Peter and Wendy', () => {
+    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'peter-and-wendy')
     expect(book).toBeDefined()
     expect(book.url).toBe(
-      'https://standardebooks.org/ebooks/beatrix-potter/the-tale-of-peter-rabbit'
+      'https://standardebooks.org/ebooks/j-m-barrie/peter-and-wendy'
     )
   })
 
@@ -62,7 +62,9 @@ describe('STANDARD_EBOOKS_CLASSICS data', () => {
   test("contains Aesop's Fables", () => {
     const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'aesops-fables')
     expect(book).toBeDefined()
-    expect(book.url).toContain('standardebooks.org')
+    expect(book.url).toBe(
+      'https://standardebooks.org/ebooks/aesop/fables/v-s-vernon-jones'
+    )
   })
 
   test("contains Alice's Adventures in Wonderland", () => {

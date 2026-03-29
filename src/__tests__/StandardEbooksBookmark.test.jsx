@@ -1,7 +1,8 @@
 // src/__tests__/StandardEbooksBookmark.test.jsx
 // Unit test: verifies that the localStorage `littick_bookmark_<bookId>` key is
-// correctly written (and read back) when the "Save Progress" button is clicked
-// inside the StandardEbooksReader component.
+// correctly written when the "Save Progress" button is clicked inside
+// StandardEbooksReader.  Tests use vi.spyOn to assert the actual setItem call,
+// not just the pre-seeded value.
 
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { vi, beforeEach, afterEach, test, expect, describe } from 'vitest'
@@ -55,39 +56,13 @@ describe('StandardEbooksReader bookmark system', () => {
     ).toBeInTheDocument()
   })
 
-  test('clicking Save Progress writes littick_bookmark_<bookId> to localStorage', async () => {
+  test('clicking Save Progress calls localStorage.setItem with the correct key and value', () => {
     const testCfi = 'epubcfi(/6/4[chap01ref]!/4[body01]/10[para05]/2/1:3)'
 
-    // Pre-seed a CFI so the button is enabled (currentCfi is not null)
+    // Pre-seed so currentCfi is non-null and the button is enabled
     localStorage.setItem(BOOKMARK_KEY, testCfi)
 
-    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
-
-    const saveBtn = screen.getByRole('button', { name: /save reading progress/i })
-
-    act(() => {
-      fireEvent.click(saveBtn)
-    })
-
-    const stored = localStorage.getItem(BOOKMARK_KEY)
-    expect(stored).toBe(testCfi)
-  })
-
-  test('localStorage key uses the littick_ prefix', () => {
-    localStorage.setItem(BOOKMARK_KEY, 'epubcfi(/6/2!/4/2/1:0)')
-
-    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
-
-    // Verify the key written uses the correct prefix
-    const keys = Object.keys(localStorage)
-    const bookmarkKeys = keys.filter(k => k.startsWith('littick_bookmark_'))
-    expect(bookmarkKeys.length).toBeGreaterThan(0)
-    expect(bookmarkKeys[0]).toBe(BOOKMARK_KEY)
-  })
-
-  test('stores the book ID in the localStorage key', async () => {
-    const cfi = 'epubcfi(/6/4!/4/2/1:0)'
-    localStorage.setItem(BOOKMARK_KEY, cfi)
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
 
@@ -95,9 +70,55 @@ describe('StandardEbooksReader bookmark system', () => {
       fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
     })
 
-    // Key must include the book ID
-    expect(localStorage.getItem(BOOKMARK_KEY)).not.toBeNull()
-    expect(BOOKMARK_KEY).toContain(TEST_BOOK.id)
+    // Verify the component called setItem with the correct key and value
+    expect(setItemSpy).toHaveBeenCalledWith(BOOKMARK_KEY, testCfi)
+
+    setItemSpy.mockRestore()
+  })
+
+  test('localStorage key written by Save Progress uses the littick_bookmark_ prefix', () => {
+    const testCfi = 'epubcfi(/6/2!/4/2/1:0)'
+    localStorage.setItem(BOOKMARK_KEY, testCfi)
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
+    })
+
+    // Extract the key used in the setItem call made by the component
+    const bookmarkCall = setItemSpy.mock.calls.find(
+      ([key]) => key.startsWith('littick_bookmark_')
+    )
+    expect(bookmarkCall).toBeDefined()
+    expect(bookmarkCall[0]).toBe(BOOKMARK_KEY)
+    expect(bookmarkCall[1]).toBe(testCfi)
+
+    setItemSpy.mockRestore()
+  })
+
+  test('Save Progress button stores the correct book ID in the key', () => {
+    const cfi = 'epubcfi(/6/4!/4/2/1:0)'
+    localStorage.setItem(BOOKMARK_KEY, cfi)
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
+    })
+
+    // The key must contain the book ID
+    const bookmarkCall = setItemSpy.mock.calls.find(
+      ([key]) => key.startsWith('littick_bookmark_')
+    )
+    expect(bookmarkCall).toBeDefined()
+    expect(bookmarkCall[0]).toContain(TEST_BOOK.id)
+
+    setItemSpy.mockRestore()
   })
 
   test('restores bookmark on mount when a saved CFI exists', () => {
@@ -112,16 +133,14 @@ describe('StandardEbooksReader bookmark system', () => {
     ).toBeInTheDocument()
   })
 
-  test('Save Progress button shows confirmation after clicking', async () => {
+  test('Save Progress button shows confirmation after clicking', () => {
     const cfi = 'epubcfi(/6/4!/4/2/1:0)'
     localStorage.setItem(BOOKMARK_KEY, cfi)
 
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
 
-    const saveBtn = screen.getByRole('button', { name: /save reading progress/i })
-
     act(() => {
-      fireEvent.click(saveBtn)
+      fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
     })
 
     expect(screen.getByText(/Saved!/i)).toBeInTheDocument()
