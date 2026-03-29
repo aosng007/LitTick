@@ -642,6 +642,18 @@ export default function App() {
 
       {/* Main card */}
       <main className="w-full max-w-2xl flex flex-col gap-4">
+        {/* Persistent timer – always visible at the top of the reading session */}
+        <div className="sticky top-2 z-20 rounded-3xl bg-white/80 backdrop-blur-sm border border-white/80 shadow-lg p-4 sm:p-5">
+          <Timer onTimerComplete={handleTimerComplete} />
+          {puzzleUnlocked && (
+            <div className="mt-3 rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-2 text-center">
+              <p className="text-sm font-bold text-yellow-700">
+                🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Tab navigation */}
         <TabBar
           active={activeTab}
@@ -671,20 +683,13 @@ export default function App() {
                   {t.id === 'timer' && (
                     <div className="flex flex-col items-center gap-4 py-2">
                       <p className="text-center font-bold text-koala-teal text-lg">
-                        ⏱ Set your 15-minute reading timer!
+                        ⏱ Your 15-minute timer is always visible at the top!
                       </p>
                       <p className="text-sm text-gray-500 text-center max-w-xs">
-                        Press <strong>Start</strong> and read your story. When the timer ends, a
-                        special surprise awaits! 🎁
+                        The timer runs throughout your reading session — you can see it above
+                        no matter which tab you are on. When the timer ends, a special
+                        surprise awaits! 🎁
                       </p>
-                      <Timer onTimerComplete={handleTimerComplete} />
-                      {puzzleUnlocked && (
-                        <div className="rounded-2xl bg-koala-yellow/30 border border-yellow-300 px-4 py-3 text-center">
-                          <p className="text-sm font-bold text-yellow-700">
-                            🔓 Word Puzzle unlocked! Check the 🔍 Puzzle tab!
-                          </p>
-                        </div>
-                      )}
                     </div>
                   )}
 
