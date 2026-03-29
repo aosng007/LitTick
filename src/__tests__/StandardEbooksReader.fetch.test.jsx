@@ -148,4 +148,52 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
     const btn = screen.getByRole('button', { name: /save reading progress/i })
     expect(btn).toBeDisabled()
   })
+
+  test('strips top-level <nav> from fetched HTML but preserves in-book nav', async () => {
+    // body > nav is site chrome; nav nested inside <main> is in-book content (e.g. ToC)
+    const htmlWithNav =
+      '<nav id="site-nav"><a href="/">Home</a></nav>' +
+      '<main><nav id="toc"><a href="#ch1">Chapter 1</a></nav><p>Chapter text.</p></main>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithNav) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    // Top-level site nav must be gone
+    expect(container.querySelector('#site-nav')).toBeNull()
+    // In-book nav (nested inside main) must be preserved
+    expect(container.querySelector('#toc')).not.toBeNull()
+    expect(container.innerHTML).toContain('Chapter text.')
+  })
+
+  test('strips top-level <header>/<footer> but preserves nested in-book elements', async () => {
+    const htmlWithChrome =
+      '<header id="site-header"><nav>Site Nav</nav></header>' +
+      '<main><header id="chapter-header"><h2>Chapter One</h2></header>' +
+      '<p>Book content.</p>' +
+      '<footer id="chapter-footer">— End of chapter —</footer></main>' +
+      '<footer id="site-footer">Site footer</footer>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(htmlWithChrome) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    // Top-level site chrome must be gone
+    expect(container.querySelector('#site-header')).toBeNull()
+    expect(container.querySelector('#site-footer')).toBeNull()
+    // In-book nested header/footer must survive
+    expect(container.querySelector('#chapter-header')).not.toBeNull()
+    expect(container.querySelector('#chapter-footer')).not.toBeNull()
+    expect(container.innerHTML).toContain('Book content.')
+  })
 })
