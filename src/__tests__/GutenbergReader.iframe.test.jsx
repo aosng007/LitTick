@@ -32,6 +32,11 @@ describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
 
   beforeEach(() => {
     originalFetch = global.fetch
+    // DiscoveryHub fetches an RSS feed for NatureExplorer on mount.
+    // Stub fetch for every test so no real network calls escape.
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({}) })
+    )
   })
 
   afterEach(() => {

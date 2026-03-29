@@ -32,9 +32,9 @@ const TEST_BOOK = {
   author: 'Lewis Carroll',
   emoji: '🐇',
   coverColor: '#3D4F8B',
-  url: 'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland',
+  url: 'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel',
   epubUrl:
-    'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/downloads/lewis-carroll_alices-adventures-in-wonderland.epub',
+    'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub',
 }
 
 const BOOKMARK_KEY = `littick_bookmark_${TEST_BOOK.id}`

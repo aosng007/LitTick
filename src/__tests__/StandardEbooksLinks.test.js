@@ -89,7 +89,7 @@ describe('Standard Ebooks links return HTTP 200', () => {
   for (const book of STANDARD_EBOOKS_CLASSICS) {
     test(
       `${book.title} page returns 200 OK`,
-      async () => {
+      async (ctx) => {
         let response
         try {
           response = await fetch(book.url, {
@@ -97,7 +97,8 @@ describe('Standard Ebooks links return HTTP 200', () => {
             signal: AbortSignal.timeout(TIMEOUT_MS),
           })
         } catch {
-          // Network unavailable in this environment – skip gracefully
+          // Network unavailable in this environment – mark as skipped rather than passing
+          ctx.skip()
           return
         }
         expect(response.status).toBe(200)
