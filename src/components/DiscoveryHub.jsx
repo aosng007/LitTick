@@ -11,123 +11,18 @@ import { useState, useEffect, useRef } from 'react'
 import Checklist from './Checklist'
 import { TOTAL_SECONDS } from './Timer'
 import NATURE_STORIES from '../content/natureData'
+import ReadingView from './ReadingView'
 
 // ---------------------------------------------------------------------------
-// GutenbergReader – inline reading view for a Gutenberg book
+// GutenbergReader – inline reading view for a Gutenberg book (iframe embed)
 // ---------------------------------------------------------------------------
 function GutenbergReader({ book, onBack }) {
-  const [text, setText] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  // Prefer plain-text format so we can render safely as text content.
-  // Validate the URL and upgrade http → https to avoid mixed-content failures.
-  const textUrl = (() => {
-    const raw =
-      book.formats?.['text/plain; charset=utf-8'] ||
-      book.formats?.['text/plain; charset=us-ascii'] ||
-      book.formats?.['text/plain'] ||
-      null
-    if (!raw) return null
-    try {
-      const parsed = new URL(raw)
-      if (parsed.protocol === 'http:') parsed.protocol = 'https:'
-      return parsed.protocol === 'https:' ? parsed.href : null
-    } catch {
-      return null
-    }
-  })()
-
-  const coverUrl = (() => {
-    try {
-      const raw = book.formats?.['image/jpeg'] || ''
-      const parsed = new URL(raw)
-      return parsed.protocol === 'https:' ? parsed.href : null
-    } catch {
-      return null
-    }
-  })()
-
-  useEffect(() => {
-    if (!textUrl) { setLoading(false); return }
-    let ignore = false
-    const controller = new AbortController()
-    // Route through allorigins.win to avoid CORS restrictions on Gutenberg text files.
-    // allorigins.win returns JSON: { contents: "<raw text>", status: {...} }
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(textUrl)}`
-    fetch(proxyUrl, { signal: controller.signal })
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json()
-      })
-      .then(data => {
-        if (ignore) return
-        // `contents` is a UTF-8 string; any charset weirdness from .txt.utf-8
-        // files is resolved by the JSON transport layer.
-        const content = data.contents || ''
-        // Show first ~2,000 characters so the view stays manageable
-        setText(content.slice(0, 2000))
-        setLoading(false)
-      })
-      .catch(err => {
-        if (ignore) return
-        if (err.name !== 'AbortError') { setText(null); setLoading(false) }
-      })
-    return () => { ignore = true; controller.abort() }
-  }, [textUrl])
-
   return (
-    <div className="flex flex-col gap-4">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-200 active:scale-95 transition-all"
-          aria-label="Back to bookshelf"
-        >
-          ← Back
-        </button>
-        {coverUrl && (
-          <img
-            src={coverUrl}
-            alt={`Cover of ${book.title}`}
-            className="w-10 h-14 object-cover rounded shadow flex-shrink-0"
-          />
-        )}
-        <div className="min-w-0">
-          <h3 className="font-extrabold text-koala-teal text-base leading-snug line-clamp-2">{book.title}</h3>
-          <p className="text-xs text-gray-500 truncate">
-            {book.authors?.map(a => a.name).join(', ') || 'Unknown author'}
-          </p>
-        </div>
-      </div>
-
-      {/* Book content */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center gap-2 py-6" aria-live="polite" aria-label="Loading book content">
-          <div className="w-8 h-8 rounded-full border-4 border-amber-300 border-t-amber-600 animate-spin" />
-          <span className="text-sm font-semibold text-amber-700">Loading…</span>
-        </div>
-      )}
-      {!loading && text && (
-        <div
-          className="rounded-2xl bg-amber-50 border border-amber-200 p-4 max-h-64 overflow-y-auto"
-          role="article"
-          aria-label={`Book text: ${book.title}`}
-        >
-          <p className="text-gray-700 leading-relaxed text-sm whitespace-pre-wrap">{text}</p>
-        </div>
-      )}
-      {!loading && !text && (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-gray-500 text-sm">
-          📚 Full text is not available for this book.
-        </div>
-      )}
-
-      {/* Reading timer */}
+    <ReadingView book={book} onBack={onBack}>
       <div className="rounded-2xl bg-white/90 border border-koala-green/20 p-4 shadow-sm">
         <ReadingTimer />
       </div>
-    </div>
+    </ReadingView>
   )
 }
 
