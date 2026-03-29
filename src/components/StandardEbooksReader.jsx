@@ -41,6 +41,32 @@ function saveBookmark(bookId, scrollPos) {
 }
 
 // ---------------------------------------------------------------------------
+// Sanitize fetched HTML before injection
+// Removes <script> tags, inline event handlers (on*), and javascript: URLs.
+// ---------------------------------------------------------------------------
+function sanitizeHtml(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  // Remove script, style and link elements wholesale
+  doc.querySelectorAll('script, style, link').forEach(el => el.remove())
+  // Strip inline event handlers and dangerous URIs from every element.
+  // Normalize: remove whitespace and lowercase to catch obfuscated variants
+  // (DOMParser already decodes HTML entities, e.g. &#106;avascript: → javascript:)
+  doc.querySelectorAll('*').forEach(el => {
+    Array.from(el.attributes).forEach(attr => {
+      if (attr.name.startsWith('on')) {
+        el.removeAttribute(attr.name)
+      } else if (['href', 'src', 'action'].includes(attr.name)) {
+        const normalized = attr.value.replace(/\s/g, '').toLowerCase()
+        if (normalized.startsWith('javascript:') || normalized.startsWith('data:') || normalized.startsWith('vbscript:')) {
+          el.removeAttribute(attr.name)
+        }
+      }
+    })
+  })
+  return doc.body.innerHTML
+}
+
+// ---------------------------------------------------------------------------
 // Main StandardEbooksReader component
 // ---------------------------------------------------------------------------
 export default function StandardEbooksReader({ book, onBack }) {
@@ -56,34 +82,42 @@ export default function StandardEbooksReader({ book, onBack }) {
 
   // Fetch the book HTML whenever the book changes
   useEffect(() => {
-    let canceled = false
+    // Validate that the URL comes from Standard Ebooks before fetching
+    let parsedUrl
+    try {
+      parsedUrl = new URL(singlePageUrl)
+    } catch {
+      setError('Could not load book: invalid book URL')
+      setLoading(false)
+      return
+    }
+    if (parsedUrl.hostname !== 'standardebooks.org') {
+      setError('Could not load book: content must come from Standard Ebooks')
+      setLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
     setLoading(true)
     setError(null)
     setHtmlContent('')
 
-    fetch(singlePageUrl)
+    fetch(singlePageUrl, { signal: controller.signal })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         return res.text()
       })
       .then(html => {
-        if (!canceled) {
-          // Parse through the browser's own HTML parser and strip script elements
-          // to reduce XSS risk before injecting via dangerouslySetInnerHTML.
-          const doc = new DOMParser().parseFromString(html, 'text/html')
-          doc.querySelectorAll('script').forEach(el => el.remove())
-          setHtmlContent(doc.body.innerHTML)
-          setLoading(false)
-        }
+        setHtmlContent(sanitizeHtml(html))
+        setLoading(false)
       })
       .catch(err => {
-        if (!canceled) {
-          setError(`Could not load book: ${err?.message || 'unknown error'}`)
-          setLoading(false)
-        }
+        if (err.name === 'AbortError') return
+        setError(`Could not load book: ${err?.message || 'unknown error'}`)
+        setLoading(false)
       })
 
-    return () => { canceled = true }
+    return () => { controller.abort() }
   }, [singlePageUrl])
 
   // Restore saved scroll position after content is injected
@@ -124,6 +158,7 @@ export default function StandardEbooksReader({ book, onBack }) {
 
         <button
           onClick={handleSaveProgress}
+          disabled={loading || !!error}
           aria-label="Save reading progress as bookmark"
           className={`flex-shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold shadow transition-all active:scale-95 ${
             bookmarkSaved

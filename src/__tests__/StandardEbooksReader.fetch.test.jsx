@@ -39,7 +39,8 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(
-        `${TEST_BOOK.url}/text/single-page`
+        `${TEST_BOOK.url}/text/single-page`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
     })
   })
@@ -88,5 +89,63 @@ describe('StandardEbooksReader – fetch-based rendering', () => {
     await waitFor(() => {
       expect(screen.getByText(/Could not load book/i)).toBeInTheDocument()
     })
+  })
+
+  test('strips <script> tags from fetched HTML before rendering', async () => {
+    const maliciousHtml = '<p>Safe text.</p><script>alert("xss")</script>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(maliciousHtml) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    expect(container.innerHTML).not.toContain('<script>')
+    expect(container.innerHTML).not.toContain('alert("xss")')
+    expect(container.innerHTML).toContain('Safe text.')
+  })
+
+  test('strips inline event handlers from fetched HTML before rendering', async () => {
+    const maliciousHtml = '<p onclick="alert(1)">Safe text.</p><a href="javascript:alert(2)">link</a>'
+    global.fetch = vi.fn(() =>
+      Promise.resolve({ ok: true, text: () => Promise.resolve(maliciousHtml) })
+    )
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+    })
+    const container = screen.getByTestId('reading-container')
+    expect(container.innerHTML).not.toContain('onclick')
+    expect(container.innerHTML).not.toContain('javascript:')
+  })
+
+  test('shows error when book URL hostname is not standardebooks.org', async () => {
+    const untrustedBook = {
+      ...TEST_BOOK,
+      url: 'https://evil.example.com/books/something',
+    }
+    global.fetch = vi.fn()
+
+    render(<StandardEbooksReader book={untrustedBook} onBack={vi.fn()} />)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Could not load book/i)).toBeInTheDocument()
+    })
+    // fetch must NOT have been called for an untrusted hostname
+    expect(global.fetch).not.toHaveBeenCalled()
+  })
+
+  test('Save Progress button is disabled while loading', () => {
+    global.fetch = vi.fn(() => new Promise(() => {}))
+
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    const btn = screen.getByRole('button', { name: /save reading progress/i })
+    expect(btn).toBeDisabled()
   })
 })

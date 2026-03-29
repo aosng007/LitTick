@@ -1,10 +1,4 @@
-// src/__tests__/StandardEbooksBookmark.test.jsx
-// Unit test: verifies that the localStorage `littick_bookmark_<bookId>` key is
-// correctly written when the "Save Progress" button is clicked inside
-// StandardEbooksReader.  The reader now uses fetch() + scroll-position bookmarks
-// instead of epubjs + EPUB CFI strings.
-
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
 import { vi, beforeEach, afterEach, test, expect, describe } from 'vitest'
 import StandardEbooksReader from '../components/StandardEbooksReader'
 
@@ -15,8 +9,6 @@ const TEST_BOOK = {
   emoji: '🐇',
   coverColor: '#3D4F8B',
   url: 'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel',
-  epubUrl:
-    'https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub',
 }
 
 const BOOKMARK_KEY = `littick_bookmark_${TEST_BOOK.id}`
@@ -47,10 +39,13 @@ describe('StandardEbooksReader bookmark system', () => {
     ).toBeInTheDocument()
   })
 
-  test('clicking Save Progress calls localStorage.setItem with the correct key', () => {
+  test('clicking Save Progress calls localStorage.setItem with the correct key', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    // Wait for the reading container to appear (fetch resolved)
+    await waitFor(() => screen.getByTestId('reading-container'))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
@@ -62,10 +57,12 @@ describe('StandardEbooksReader bookmark system', () => {
     setItemSpy.mockRestore()
   })
 
-  test('localStorage key written by Save Progress uses the littick_bookmark_ prefix', () => {
+  test('localStorage key written by Save Progress uses the littick_bookmark_ prefix', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => screen.getByTestId('reading-container'))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
@@ -81,10 +78,12 @@ describe('StandardEbooksReader bookmark system', () => {
     setItemSpy.mockRestore()
   })
 
-  test('Save Progress button stores the correct book ID in the key', () => {
+  test('Save Progress button stores the correct book ID in the key', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => screen.getByTestId('reading-container'))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
@@ -100,20 +99,36 @@ describe('StandardEbooksReader bookmark system', () => {
     setItemSpy.mockRestore()
   })
 
-  test('restores bookmark on mount when a saved scroll position exists', () => {
+  test('restores bookmark on mount by applying saved scroll position to container', async () => {
     const savedPosition = '250'
     localStorage.setItem(BOOKMARK_KEY, savedPosition)
 
-    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+    // jsdom does not implement real scrolling geometry, so intercept the setter
+    let capturedScrollTop
+    const originalDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop')
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      set(val) { capturedScrollTop = val },
+      get() { return capturedScrollTop ?? 0 },
+      configurable: true,
+    })
 
-    // The component should mount and show the Save Progress button
-    expect(
-      screen.getByRole('button', { name: /save reading progress/i })
-    ).toBeInTheDocument()
+    try {
+      render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+      await waitFor(() => {
+        expect(screen.getByTestId('reading-container')).toBeInTheDocument()
+      })
+      expect(capturedScrollTop).toBe(250)
+    } finally {
+      // Always restore the original descriptor even if assertions fail
+      Object.defineProperty(Element.prototype, 'scrollTop', originalDescriptor)
+    }
   })
 
-  test('Save Progress button shows confirmation after clicking', () => {
+  test('Save Progress button shows confirmation after clicking', async () => {
     render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => screen.getByTestId('reading-container'))
 
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: /save reading progress/i }))
