@@ -11,22 +11,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { vi } from 'vitest'
 import DiscoveryHub from '../components/DiscoveryHub'
 
-// Mock epubjs to prevent it attempting to load real EPUB files in jsdom
-vi.mock('epubjs', () => {
-  const mockRendition = {
-    on: vi.fn(),
-    display: vi.fn(() => Promise.resolve()),
-    destroy: vi.fn(),
-  }
-  return {
-    default: vi.fn(() => ({
-      renderTo: vi.fn(() => mockRendition),
-      ready: Promise.resolve(),
-      destroy: vi.fn(),
-    })),
-  }
-})
-
 describe('StandardEbooksShelf (replaces Gutenberg reader)', () => {
   let originalFetch
 

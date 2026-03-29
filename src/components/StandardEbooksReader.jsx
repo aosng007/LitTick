@@ -1,18 +1,23 @@
 /**
  * StandardEbooksReader.jsx
- * In-app EPUB reader powered by epubjs for Standard Ebooks content.
+ * Fetches the single-page HTML edition of a book from Standard Ebooks using
+ * fetch() and injects it directly into a scrollable ReadingContainer.
+ *
+ * This approach replaces the previous epubjs/EPUB strategy and avoids the
+ * X-Frame-Options: sameorigin restriction that blocks iframe embeds.
+ * Because the book text lives on the same page, the Timer and Bookmark
+ * controls remain visible at all times.
  *
  * Features:
- *   • Renders the EPUB file directly inside the app (no raw external iframe).
- *   • Bookmark system: "Save Progress" stores the current CFI location in
- *     localStorage under the key `littick_bookmark_<bookId>` and restores it
- *     automatically the next time the same book is opened.
- *
- * The 15-minute reading timer is provided by the shared <Timer /> component
- * rendered persistently in App.jsx – no local timer is rendered here.
+ *   • fetch() retrieves the book HTML from <bookUrl>/text/single-page
+ *   • dangerouslySetInnerHTML injects the text into the ReadingContainer
+ *   • Large fonts and clear spacing are applied for young readers
+ *   • Bookmark system: "Save Progress" stores the scroll position in
+ *     localStorage under the key `littick_bookmark_<bookId>` and restores
+ *     it automatically the next time the same book is opened.
  *
  * Props:
- *   book   – an entry from STANDARD_EBOOKS_CLASSICS (id, title, author, epubUrl, …)
+ *   book   – an entry from STANDARD_EBOOKS_CLASSICS (id, title, author, url, …)
  *   onBack – callback invoked when the user presses the Back button
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -29,9 +34,9 @@ function loadBookmark(bookId) {
   }
 }
 
-function saveBookmark(bookId, cfi) {
+function saveBookmark(bookId, scrollPos) {
   try {
-    localStorage.setItem(`littick_bookmark_${bookId}`, cfi)
+    localStorage.setItem(`littick_bookmark_${bookId}`, scrollPos)
   } catch { /* localStorage unavailable – storage restriction */ }
 }
 
@@ -39,74 +44,63 @@ function saveBookmark(bookId, cfi) {
 // Main StandardEbooksReader component
 // ---------------------------------------------------------------------------
 export default function StandardEbooksReader({ book, onBack }) {
-  const viewerRef = useRef(null)
-  const epubBookRef = useRef(null)
-  const renditionRef = useRef(null)
+  const containerRef = useRef(null)
 
-  // CFI location – either restored from bookmark or null (start of book)
-  const [currentCfi, setCurrentCfi] = useState(() => loadBookmark(book.id))
+  const [htmlContent, setHtmlContent] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [bookmarkSaved, setBookmarkSaved] = useState(false)
-  const [readerReady, setReaderReady] = useState(false)
-  const [readerError, setReaderError] = useState(null)
 
-  // Initialise epubjs when the component mounts
+  // Construct the single-page URL from the book's canonical Standard Ebooks URL
+  const singlePageUrl = `${book.url}/text/single-page`
+
+  // Fetch the book HTML whenever the book changes
   useEffect(() => {
-    if (!viewerRef.current) return
-
     let canceled = false
+    setLoading(true)
+    setError(null)
+    setHtmlContent('')
 
-    import('epubjs').then(({ default: Epub }) => {
-      if (canceled) return
-
-      const epubBook = new Epub(book.epubUrl, { openAs: 'epub' })
-      epubBookRef.current = epubBook
-
-      const rendition = epubBook.renderTo(viewerRef.current, {
-        width: '100%',
-        height: '100%',
-        flow: 'scrolled-doc',
-        allowScriptedContent: false,
+    fetch(singlePageUrl)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        return res.text()
       })
-      renditionRef.current = rendition
-
-      rendition.on('relocated', location => {
-        if (location?.start?.cfi) {
-          setCurrentCfi(location.start.cfi)
-          setBookmarkSaved(false)
+      .then(html => {
+        if (!canceled) {
+          // Parse through the browser's own HTML parser and strip script elements
+          // to reduce XSS risk before injecting via dangerouslySetInnerHTML.
+          const doc = new DOMParser().parseFromString(html, 'text/html')
+          doc.querySelectorAll('script').forEach(el => el.remove())
+          setHtmlContent(doc.body.innerHTML)
+          setLoading(false)
+        }
+      })
+      .catch(err => {
+        if (!canceled) {
+          setError(`Could not load book: ${err?.message || 'unknown error'}`)
+          setLoading(false)
         }
       })
 
-      rendition.on('rendered', () => {
-        if (!canceled) setReaderReady(true)
-      })
+    return () => { canceled = true }
+  }, [singlePageUrl])
 
-      epubBook.ready.catch(err => {
-        if (!canceled) setReaderError(`Could not load book: ${err?.message || 'unknown error'}`)
-      })
-
-      // Display from saved bookmark or beginning
-      const savedCfi = loadBookmark(book.id)
-      rendition.display(savedCfi || undefined).catch(err => {
-        if (!canceled) setReaderError(`Could not display book: ${err?.message || 'unknown error'}`)
-      })
-    }).catch(err => {
-      if (!canceled) setReaderError(`Reader failed to load: ${err?.message || 'unknown error'}`)
-    })
-
-    return () => {
-      canceled = true
-      try { renditionRef.current?.destroy() } catch { /* ignore */ }
-      try { epubBookRef.current?.destroy() } catch { /* ignore */ }
-      renditionRef.current = null
-      epubBookRef.current = null
+  // Restore saved scroll position after content is injected
+  useEffect(() => {
+    if (!htmlContent || !containerRef.current) return
+    const saved = loadBookmark(book.id)
+    if (saved) {
+      const pos = parseInt(saved, 10)
+      if (!Number.isNaN(pos) && pos >= 0) containerRef.current.scrollTop = pos
     }
-  }, [book.epubUrl, book.id])
+  }, [htmlContent, book.id])
 
   const handleSaveProgress = useCallback(() => {
-    if (!currentCfi) return
-    saveBookmark(book.id, currentCfi)
+    const scrollPos = String(containerRef.current?.scrollTop ?? 0)
+    saveBookmark(book.id, scrollPos)
     setBookmarkSaved(true)
-  }, [book.id, currentCfi])
+  }, [book.id])
 
   return (
     <div className="flex flex-col gap-3">
@@ -130,7 +124,6 @@ export default function StandardEbooksReader({ book, onBack }) {
 
         <button
           onClick={handleSaveProgress}
-          disabled={!currentCfi}
           aria-label="Save reading progress as bookmark"
           className={`flex-shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-bold shadow transition-all active:scale-95 ${
             bookmarkSaved
@@ -146,7 +139,7 @@ export default function StandardEbooksReader({ book, onBack }) {
       <p className="text-xs text-gray-400 text-center">
         Source:{' '}
         <a
-          href={`https://standardebooks.org`}
+          href="https://standardebooks.org"
           target="_blank"
           rel="noopener noreferrer"
           className="underline hover:text-gray-600"
@@ -156,32 +149,37 @@ export default function StandardEbooksReader({ book, onBack }) {
         {' '}· Free, high-quality public-domain ebooks
       </p>
 
-      {/* ── EPUB viewer container ── */}
-      {readerError ? (
-        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-gray-500 text-sm">
-          📚 {readerError}
-        </div>
-      ) : (
-        <div
-          ref={viewerRef}
-          className="w-full rounded-2xl border border-amber-200 bg-white overflow-hidden"
-          style={{ height: '65vh', minHeight: '360px' }}
-          aria-label={`Reading: ${book.title}`}
-          data-testid="epub-viewer"
-        />
-      )}
-
-      {!readerReady && !readerError && (
+      {/* ── Loading state ── */}
+      {loading && (
         <p className="text-center text-sm text-gray-400 animate-pulse">
           📖 Loading book…
         </p>
       )}
 
-      {/* ── Bookmark restore hint ── */}
-      {currentCfi && !bookmarkSaved && (
-        <p className="text-xs text-center text-koala-teal font-semibold">
-          💡 Press <strong>Save Progress</strong> to bookmark your place!
-        </p>
+      {/* ── Error state ── */}
+      {error && (
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-center text-gray-500 text-sm">
+          📚 {error}
+        </div>
+      )}
+
+      {/* ── ReadingContainer: injected book HTML styled for young readers ── */}
+      {!loading && !error && (
+        <div
+          ref={containerRef}
+          data-testid="reading-container"
+          className="reading-container w-full rounded-2xl border border-amber-200 bg-white overflow-auto"
+          style={{
+            height: '65vh',
+            minHeight: '360px',
+            fontSize: '1.25rem',
+            lineHeight: '1.9',
+            padding: '1.5rem',
+          }}
+          aria-label={`Reading: ${book.title}`}
+          // eslint-disable-next-line react/no-danger
+          dangerouslySetInnerHTML={{ __html: htmlContent }}
+        />
       )}
     </div>
   )
