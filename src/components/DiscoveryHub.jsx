@@ -13,6 +13,7 @@ import { TOTAL_SECONDS } from './Timer'
 import NATURE_STORIES from '../content/natureData'
 import StandardEbooksReader from './StandardEbooksReader'
 import { STANDARD_EBOOKS_CLASSICS } from '../content/StandardEbooksClassics'
+import DictionaryPopover, { getSelectedWord } from './DictionaryPopover'
 
 // ---------------------------------------------------------------------------
 // Standard Ebooks Shelf – displays 5 hardcoded Year 2 classics
@@ -350,6 +351,12 @@ function NatureReadingView({ story, onBack }) {
   const storyId = getNatureStoryId(story)
   // Prefer fullContent (local stories), then summary, then strip HTML from RSS content
   const text = story.fullContent || story.summary || stripHtml(story.description || story.content || story.title || '')
+  const [activeWord, setActiveWord] = useState(null)
+
+  const handleTextSelect = () => {
+    const word = getSelectedWord()
+    if (word) setActiveWord(word)
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -368,17 +375,27 @@ function NatureReadingView({ story, onBack }) {
         </h3>
       </div>
 
-      {/* Story text */}
-      <div
-        className="rounded-2xl bg-green-50 border border-green-200 p-4 max-h-64 overflow-y-auto"
-        role="article"
-        aria-label={`Story text: ${story.title}`}
-      >
-        {text.split('\n\n').map((para) => (
-          <p key={para.slice(0, 40)} className="text-gray-700 leading-relaxed text-base mb-3 last:mb-0">
-            {para.trim()}
-          </p>
-        ))}
+      {/* Story text – select a word to look it up */}
+      <div className="relative">
+        <div
+          className="rounded-2xl bg-green-50 border border-green-200 p-4 max-h-64 overflow-y-auto"
+          role="article"
+          aria-label={`Story text: ${story.title}`}
+          onMouseUp={handleTextSelect}
+        >
+          {text.split('\n\n').map((para) => (
+            <p key={para.slice(0, 40)} className="text-gray-700 leading-relaxed text-base mb-3 last:mb-0">
+              {para.trim()}
+            </p>
+          ))}
+        </div>
+        {activeWord && (
+          <DictionaryPopover
+            word={activeWord}
+            onClose={() => setActiveWord(null)}
+            maxWords={10}
+          />
+        )}
       </div>
 
       {/* Timer – auto-starts immediately */}

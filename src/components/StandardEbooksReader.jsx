@@ -24,6 +24,7 @@
  *   onBack – callback invoked when the user presses the Back button
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
+import DictionaryPopover, { getSelectedWord } from './DictionaryPopover'
 
 // ---------------------------------------------------------------------------
 // localStorage helpers – always use the littick_ prefix
@@ -137,6 +138,7 @@ export default function StandardEbooksReader({ book, onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [bookmarkSaved, setBookmarkSaved] = useState(false)
+  const [activeWord, setActiveWord] = useState(null)
 
   // Construct the single-page URL from the book's canonical Standard Ebooks URL
   const singlePageUrl = `${book.url}/text/single-page`
@@ -273,21 +275,34 @@ export default function StandardEbooksReader({ book, onBack }) {
 
       {/* ── ReadingContainer: injected book HTML styled for young readers ── */}
       {!loading && !error && (
-        <div
-          ref={containerRef}
-          data-testid="reading-container"
-          className="reading-container w-full rounded-2xl border border-amber-200 bg-white overflow-auto"
-          style={{
-            height: '65vh',
-            minHeight: '360px',
-            fontSize: '1.25rem',
-            lineHeight: '1.9',
-            padding: '1.5rem',
-          }}
-          aria-label={`Reading: ${book.title}`}
-          // eslint-disable-next-line react/no-danger
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
+        <div className="relative">
+          <div
+            ref={containerRef}
+            data-testid="reading-container"
+            className="reading-container w-full rounded-2xl border border-amber-200 bg-white overflow-auto"
+            style={{
+              height: '65vh',
+              minHeight: '360px',
+              fontSize: '1.25rem',
+              lineHeight: '1.9',
+              padding: '1.5rem',
+            }}
+            aria-label={`Reading: ${book.title}`}
+            onMouseUp={() => {
+              const word = getSelectedWord()
+              if (word) setActiveWord(word)
+            }}
+            // eslint-disable-next-line react/no-danger
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+          {activeWord && (
+            <DictionaryPopover
+              word={activeWord}
+              onClose={() => setActiveWord(null)}
+              maxWords={10}
+            />
+          )}
+        </div>
       )}
     </div>
   )
