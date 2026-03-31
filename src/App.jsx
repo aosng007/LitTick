@@ -565,6 +565,11 @@ export default function App() {
             <DiscoveryHub storyTheme="children adventure animals" />
           </div>
         )}
+
+        {/* Global timer overlay – fixed at top-right so it persists across all screens */}
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg">
+          <Timer onTimerComplete={handleTimerComplete} />
+        </div>
       </div>
     )
   }
@@ -643,18 +648,7 @@ export default function App() {
       {/* Main card */}
       <main className="w-full max-w-2xl flex flex-col gap-4">
         {/* Fixed timer overlay – always visible above the reading container */}
-        <div
-          style={{
-            position: 'fixed',
-            top: '10px',
-            right: '10px',
-            zIndex: 10000,
-            backgroundColor: '#FFD700',
-            borderRadius: '16px',
-            padding: '12px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          }}
-        >
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg">
           <Timer onTimerComplete={handleTimerComplete} />
         </div>
         {puzzleUnlocked && (

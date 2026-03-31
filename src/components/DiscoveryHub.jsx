@@ -7,9 +7,8 @@
  *
  * Primary reading and exploration experiences are rendered within the app UI.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import Checklist from './Checklist'
-import { TOTAL_SECONDS } from './Timer'
 import NATURE_STORIES from '../content/natureData'
 import StandardEbooksReader from './StandardEbooksReader'
 import { STANDARD_EBOOKS_CLASSICS } from '../content/StandardEbooksClassics'
@@ -172,17 +171,6 @@ function DailyNews({ topic = 'children education' }) {
 /** Maximum number of characters to use from a raw guid/link when building a story ID. */
 const MAX_ID_SUFFIX_LENGTH = 50
 
-/** Seconds remaining when the timer ring turns amber (warning zone). */
-const WARNING_THRESHOLD_SECONDS = 120
-/** Seconds remaining when the timer ring turns red (critical zone). */
-const CRITICAL_THRESHOLD_SECONDS = 60
-/** Ring colour when reading time is plentiful. */
-const TIMER_COLOR_GREEN = '#5BAD8F'
-/** Ring colour in the warning zone (last 2 minutes). */
-const TIMER_COLOR_AMBER = '#F59E0B'
-/** Ring colour in the critical zone (last 1 minute). */
-const TIMER_COLOR_RED = '#EF4444'
-
 /** Strip HTML tags from RSS content so it is safe to render as plain text. */
 function stripHtml(html) {
   if (!html) return ''
@@ -235,115 +223,6 @@ function getNatureStoryId(item) {
 }
 
 // ---------------------------------------------------------------------------
-// ReadingTimer – auto-starts countdown; session-only (no localStorage) so it
-// does not conflict with the main story timer's littick_timer_state key.
-// ---------------------------------------------------------------------------
-function ReadingTimer() {
-  const [secondsLeft, setSecondsLeft] = useState(TOTAL_SECONDS)
-  const [isTimerActive, setIsTimerActive] = useState(true) // auto-start
-  const [hasFinished, setHasFinished] = useState(false)
-  const intervalRef = useRef(null)
-
-  useEffect(() => {
-    if (!isTimerActive || hasFinished) return
-    intervalRef.current = setInterval(() => {
-      setSecondsLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current)
-          setIsTimerActive(false)
-          setHasFinished(true)
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-    return () => clearInterval(intervalRef.current)
-  }, [isTimerActive, hasFinished])
-
-  const minutes = Math.floor(secondsLeft / 60)
-  const seconds = secondsLeft % 60
-  const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  const progress = ((TOTAL_SECONDS - secondsLeft) / TOTAL_SECONDS) * 100
-  const r = 42
-  const circumference = 2 * Math.PI * r
-  const strokeDashoffset = circumference - (progress / 100) * circumference
-  const ringColour =
-    secondsLeft > WARNING_THRESHOLD_SECONDS ? TIMER_COLOR_GREEN
-    : secondsLeft > CRITICAL_THRESHOLD_SECONDS ? TIMER_COLOR_AMBER
-    : TIMER_COLOR_RED
-
-  return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xl" aria-hidden="true">⏱</span>
-        <span className="font-bold text-koala-teal text-base">15-Minute Reading Timer</span>
-      </div>
-
-      <div className="relative w-28 h-28">
-        <svg className="w-full h-full -rotate-90" viewBox="0 0 96 96" aria-hidden="true">
-          <circle cx="48" cy="48" r={r} fill="none" stroke="#E5E7EB" strokeWidth="6" />
-          <circle
-            cx="48" cy="48" r={r}
-            fill="none"
-            stroke={ringColour}
-            strokeWidth="6"
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-            style={{ transition: 'stroke-dashoffset 0.8s ease, stroke 0.6s ease' }}
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-xl font-extrabold tabular-nums"
-            style={{ color: ringColour }}
-            aria-live="polite"
-            aria-label={`${minutes} minutes and ${seconds} seconds remaining`}
-          >
-            {timeString}
-          </span>
-          <span className="text-xs text-gray-400 font-semibold mt-0.5">
-            {hasFinished ? 'Done! 🎉' : isTimerActive ? 'Reading…' : 'Paused'}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex gap-2 flex-wrap justify-center">
-        {isTimerActive && !hasFinished && (
-          <button
-            onClick={() => setIsTimerActive(false)}
-            className="rounded-xl bg-amber-400 px-4 py-2 text-white font-bold text-sm shadow hover:bg-amber-500 active:scale-95 transition-all"
-            aria-label="Pause reading timer"
-          >
-            ⏸ Pause
-          </button>
-        )}
-        {!isTimerActive && !hasFinished && (
-          <button
-            onClick={() => setIsTimerActive(true)}
-            className="rounded-xl bg-koala-green px-4 py-2 text-white font-bold text-sm shadow hover:bg-koala-teal active:scale-95 transition-all"
-            aria-label="Resume reading timer"
-          >
-            ▶ Resume
-          </button>
-        )}
-        {hasFinished && (
-          <p className="font-bold text-koala-teal text-sm text-center">
-            🎉 Amazing reading! You finished your 15 minutes!
-          </p>
-        )}
-      </div>
-
-      {isTimerActive && !hasFinished && (
-        <p className="text-xs text-koala-teal font-semibold animate-pulse text-center">
-          📖 Great job reading! Keep going! 🌟
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // NatureReadingView – dedicated reading screen for a nature story
 // ---------------------------------------------------------------------------
 function NatureReadingView({ story, onBack }) {
@@ -379,11 +258,6 @@ function NatureReadingView({ story, onBack }) {
             {para.trim()}
           </p>
         ))}
-      </div>
-
-      {/* Timer – auto-starts immediately */}
-      <div className="rounded-2xl bg-white/90 border border-koala-green/20 p-4 shadow-sm">
-        <ReadingTimer />
       </div>
 
       {/* Five Finger Retell Checklist */}
