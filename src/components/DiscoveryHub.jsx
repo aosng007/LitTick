@@ -104,6 +104,7 @@ function StandardEbooksShelf({ initialBookId }) {
                       aria-valuenow={pct}
                       aria-valuemin={0}
                       aria-valuemax={100}
+                      aria-label={`${book.title} reading progress`}
                       aria-label={`${book.title} reading progress: ${pct}%`}
                     />
                   </div>
