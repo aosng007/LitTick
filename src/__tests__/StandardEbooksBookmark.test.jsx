@@ -29,6 +29,9 @@ describe('StandardEbooksReader bookmark system', () => {
   afterEach(() => {
     global.fetch = originalFetch
     localStorage.removeItem(BOOKMARK_KEY)
+    localStorage.removeItem(`littick_progress_${TEST_BOOK.id}`)
+    localStorage.removeItem('littick_last_book')
+    localStorage.removeItem('littick_completed_books')
     vi.clearAllMocks()
   })
 
@@ -135,5 +138,55 @@ describe('StandardEbooksReader bookmark system', () => {
     })
 
     expect(screen.getByText(/Saved!/i)).toBeInTheDocument()
+  })
+
+  test('sets littick_last_book in localStorage on mount', async () => {
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => screen.getByTestId('reading-container'))
+
+    expect(localStorage.getItem('littick_last_book')).toBe(TEST_BOOK.id)
+  })
+
+  test('saves littick_progress_ to localStorage when scroll position changes', async () => {
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    // Mock scrollable container geometry so computeAndSyncProgress detects a non-zero %
+    const mockValues = { scrollTop: 150, scrollHeight: 600, clientHeight: 300 }
+    const originalDescriptors = {}
+    for (const prop of Object.keys(mockValues)) {
+      originalDescriptors[prop] = Object.getOwnPropertyDescriptor(Element.prototype, prop)
+      Object.defineProperty(Element.prototype, prop, {
+        get() { return mockValues[prop] },
+        set(v) { mockValues.scrollTop = v },
+        configurable: true,
+      })
+    }
+
+    try {
+      render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+      await waitFor(() => screen.getByTestId('reading-container'))
+
+      const container = screen.getByTestId('reading-container')
+
+      await act(async () => {
+        fireEvent.scroll(container)
+        // Allow the rAF callback to flush in jsdom
+        await new Promise(r => setTimeout(r, 50))
+      })
+
+      const progressCall = setItemSpy.mock.calls.find(
+        ([key]) => key === `littick_progress_${TEST_BOOK.id}`
+      )
+      expect(progressCall).toBeDefined()
+      expect(Number.isFinite(parseInt(progressCall[1], 10))).toBe(true)
+    } finally {
+      for (const prop of Object.keys(mockValues)) {
+        if (originalDescriptors[prop]) {
+          Object.defineProperty(Element.prototype, prop, originalDescriptors[prop])
+        }
+      }
+      setItemSpy.mockRestore()
+    }
   })
 })

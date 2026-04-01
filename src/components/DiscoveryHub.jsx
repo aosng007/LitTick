@@ -1,7 +1,7 @@
 /**
  * DiscoveryHub.jsx
  * Discovery Hub – showcases three content sources:
- *   1. Standard Ebooks Shelf  (5 hardcoded Year 2 classics, rendered via epubjs)
+ *   1. Standard Ebooks Shelf  (8 child-friendly classics, rendered via fetch + dangerouslySetInnerHTML)
  *   2. Daily News             (NewsAPI – requires API key)
  *   3. Nature Explorer        (National Geographic RSS via rss2json, with local fallback)
  *
@@ -104,6 +104,7 @@ function StandardEbooksShelf({ initialBookId }) {
                       aria-valuenow={pct}
                       aria-valuemin={0}
                       aria-valuemax={100}
+                      aria-label={`${book.title} reading progress: ${pct}%`}
                     />
                   </div>
                 )}

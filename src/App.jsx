@@ -42,6 +42,26 @@ function migrateStorageKeys() {
 migrateStorageKeys()
 
 // ---------------------------------------------------------------------------
+// Helper – award a badge (used across the app for badges not triggered by Timer.jsx)
+// ---------------------------------------------------------------------------
+function awardBadge(badgeId) {
+  try {
+    const raw = localStorage.getItem('littick_user_badges')
+    const parsed = JSON.parse(raw || '[]')
+    const badges = Array.isArray(parsed) ? parsed : []
+    if (!badges.includes(badgeId)) {
+      localStorage.setItem('littick_user_badges', JSON.stringify([...badges, badgeId]))
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
+// Award Early Bird badge on app load if current hour is before 8 AM.
+// Called once at module level so it fires even before any component mounts.
+if (new Date().getHours() < 8) {
+  awardBadge('early_bird')
+}
+
+// ---------------------------------------------------------------------------
 // Helper – safely parse the unlocked-stories array from localStorage
 // ---------------------------------------------------------------------------
 function safeParseUnlocked() {
@@ -437,6 +457,20 @@ export default function App() {
         <div className="w-full max-w-2xl">
           <StandardEbooksReader book={resumeBook} onBack={() => setResumeBook(null)} />
         </div>
+
+        {/* Fixed timer overlay – scaled down on mobile */}
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg scale-[0.6] sm:scale-100 origin-top-right">
+          <Timer onTimerComplete={handleTimerComplete} />
+        </div>
+
+        {/* Achievements button – fixed at top-left */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="fixed top-2.5 left-2.5 z-[10000] flex items-center gap-1.5 rounded-2xl bg-yellow-400/90 px-3 py-2 text-sm font-bold text-yellow-900 shadow-lg hover:bg-yellow-400 active:scale-[0.57] sm:active:scale-95 transition-all scale-[0.6] sm:scale-100 origin-top-left"
+          aria-label="View my achievements"
+        >
+          🏆 <span className="hidden sm:inline">My Achievements</span>
+        </button>
       </div>
     )
   }
@@ -475,6 +509,7 @@ export default function App() {
                       aria-valuenow={lastRead.pct}
                       aria-valuemin={0}
                       aria-valuemax={100}
+                      aria-label={`${lastRead.book.title} reading progress: ${lastRead.pct}%`}
                     />
                   </div>
                   <span className="text-xs text-gray-400 font-semibold tabular-nums w-8 text-right">{lastRead.pct}%</span>
@@ -483,7 +518,7 @@ export default function App() {
               <button
                 onClick={() => setResumeBook(lastRead.book)}
                 className="flex-shrink-0 rounded-xl bg-koala-green px-4 py-2 text-sm font-bold text-white shadow hover:bg-koala-teal active:scale-95 transition-all"
-                aria-label={`Resume reading ${lastRead.book.title} at ${lastRead.pct}%`}
+                aria-label={`Resume reading ${lastRead.book.title} from where you left off`}
               >
                 ▶ Resume
               </button>
@@ -517,7 +552,7 @@ export default function App() {
         {/* Achievements button – fixed at top-left */}
         <button
           onClick={() => setShowAchievements(true)}
-          className="fixed top-2.5 left-2.5 z-[10000] flex items-center gap-1.5 rounded-2xl bg-yellow-400/90 px-3 py-2 text-sm font-bold text-yellow-900 shadow-lg hover:bg-yellow-400 active:scale-95 transition-all scale-[0.6] sm:scale-100 origin-top-left"
+          className="fixed top-2.5 left-2.5 z-[10000] flex items-center gap-1.5 rounded-2xl bg-yellow-400/90 px-3 py-2 text-sm font-bold text-yellow-900 shadow-lg hover:bg-yellow-400 active:scale-[0.57] sm:active:scale-95 transition-all scale-[0.6] sm:scale-100 origin-top-left"
           aria-label="View my achievements"
         >
           🏆 <span className="hidden sm:inline">My Achievements</span>

@@ -17,9 +17,11 @@ All keys written to `localStorage` **must** use the `littick_` prefix. Using any
 | `littick_timer_state` | `JSON string → object` | Persisted timer snapshot: `{ secondsLeft: number, hasFinished: boolean, isTimerActive: boolean, lastSavedAt: number \| null }`. `lastSavedAt` is the `Date.now()` value at the time of the last save; used to fast-forward elapsed time on page reload. |
 | `littick_checklist_<storyId>` | `JSON string → object` | Five Finger Retell state for a specific story: `{ checked: Record<string,boolean>, notes: Record<string,string> }`. `<storyId>` is replaced by the story ID (e.g. `littick_checklist_koala`). |
 | `littick_user_badges` | `JSON string → string[]` | Array of badge identifiers earned by the user (e.g. `["reading_star","puzzle_master"]`). |
-| `littick_bookmark_<bookId>` | `string` | Scroll position (integer pixels as a string) saved by the "Save Progress" button in the Standard Ebooks reader. `<bookId>` is the book's unique `id` field (e.g. `littick_bookmark_alice-wonderland`). |
-| `littick_progress_<bookId>` | `string` | Reading progress as an integer percentage (0–100) derived from the scroll position in the Standard Ebooks reader. Updated in real-time as the user scrolls. |
+| `littick_bookmark_<bookId>` | `string` | Scroll position (integer pixels as a string) auto-saved during scrolling and also written by the "Save Progress" button in the Standard Ebooks reader. `<bookId>` is the book's unique `id` field (e.g. `littick_bookmark_alice-wonderland`). |
+| `littick_progress_<bookId>` | `string` | Reading progress as an integer percentage (0–100) derived from the scroll position in the Standard Ebooks reader. Updated in real-time as the user scrolls (only written when the rounded % changes). |
 | `littick_last_book` | `string` | ID of the most recently opened Standard Ebooks classic (e.g. `"alice-wonderland"`). Used to populate the "Resume" banner on the home screen. |
+| `littick_completed_books` | `JSON string → string[]` | Array of Standard Ebooks classic IDs for which the user has scrolled to 100%. Used to award the Bookworm badge after 3 completions. |
+| `littick_word_lookups` | `JSON string → string[]` | Array of distinct lowercase words successfully looked up in the dictionary. Used to award the Word Wizard badge after 5 unique lookups. |
 
 ### Rules
 
