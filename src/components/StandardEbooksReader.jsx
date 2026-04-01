@@ -301,26 +301,21 @@ export default function StandardEbooksReader({ book, onBack, backLabel = 'Back t
   // Attach scroll listener to track reading progress percentage.
   // UI is updated every rAF; localStorage is only written when the rounded % changes
   // to avoid synchronous storage writes on every scroll tick (which can cause jank).
-    const updateProgressFromScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const scrollable = scrollHeight - clientHeight
-      const pct =
-        scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
-      setReadPercent(pct)
-      saveProgress(book.id, pct)
-    }
+  useEffect(() => {
+    if (!htmlContent || !containerRef.current) return
+    const container = containerRef.current
 
     let rafId = null
     const handleScroll = () => {
       if (rafId) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        updateProgressFromScroll()
+        computeAndSyncProgress()
       })
     }
 
     // Sync initial readPercent with the actual scroll position after content load
-    updateProgressFromScroll()
+    computeAndSyncProgress()
     container.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       container.removeEventListener('scroll', handleScroll)
