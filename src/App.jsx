@@ -455,7 +455,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex flex-col items-center px-3 py-4 sm:px-6 sm:py-6">
         <div className="w-full max-w-2xl">
-          <StandardEbooksReader book={resumeBook} onBack={() => setResumeBook(null)} />
+          <StandardEbooksReader book={resumeBook} onBack={() => setResumeBook(null)} backLabel="Back to story selection" />
         </div>
 
         {/* Fixed timer overlay – scaled down on mobile */}

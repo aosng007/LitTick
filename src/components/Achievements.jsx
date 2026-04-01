@@ -37,7 +37,7 @@ const ALL_BADGES = [
     id: 'puzzle_master',
     emoji: '🔍',
     name: 'Puzzle Master',
-    description: 'Solved three Word Search puzzles.',
+    description: 'Solved all the hidden words in a Word Search puzzle!',
     lockedDescription: 'Find all the hidden words in the Word Search puzzle.',
     colour: 'from-green-100 to-green-50 border-green-300',
   },

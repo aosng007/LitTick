@@ -187,7 +187,7 @@ function sanitizeHtml(html, baseUrl) {
 // ---------------------------------------------------------------------------
 // Main StandardEbooksReader component
 // ---------------------------------------------------------------------------
-export default function StandardEbooksReader({ book, onBack }) {
+export default function StandardEbooksReader({ book, onBack, backLabel = 'Back to bookshelf' }) {
   const containerRef = useRef(null)
 
   const [htmlContent, setHtmlContent] = useState('')
@@ -200,6 +200,8 @@ export default function StandardEbooksReader({ book, onBack }) {
   const lastSavedPctRef = useRef(loadProgress(book.id))
   // Guard to ensure trackCompletedBook is called at most once per book per session
   const bookCompletedRef = useRef(false)
+  // Track last saved scroll pixel position; only write when it changes by > threshold
+  const lastSavedScrollTopRef = useRef(null)
 
   // Construct the single-page URL from the book's canonical Standard Ebooks URL
   const singlePageUrl = `${book.url}/text/single-page`
@@ -252,15 +254,23 @@ export default function StandardEbooksReader({ book, onBack }) {
     const scrollable = scrollHeight - clientHeight
     const pct = scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
     setReadPercent(pct)
+    // Save bookmark pixel position when scroll changes by more than a small threshold
+    // (20px), avoiding excessive writes while still restoring close to last position.
+    const BOOKMARK_THRESHOLD_PX = 20
+    if (lastSavedScrollTopRef.current === null || Math.abs(scrollTop - lastSavedScrollTopRef.current) >= BOOKMARK_THRESHOLD_PX) {
+      lastSavedScrollTopRef.current = scrollTop
+      saveBookmark(book.id, String(scrollTop))
+    }
+    // Only persist % when it actually changes to avoid redundant localStorage writes.
     if (pct !== lastSavedPctRef.current) {
       lastSavedPctRef.current = pct
       saveProgress(book.id, pct)
-      // Auto-save bookmark alongside progress so "Resume" always restores position
-      saveBookmark(book.id, String(scrollTop))
-      if (pct === 100 && !bookCompletedRef.current) {
-        bookCompletedRef.current = true
-        trackCompletedBook(book.id)
-      }
+    }
+    // Check completion outside the % change guard so a book already at 100%
+    // (e.g., pre-seeded progress) is still recorded in littick_completed_books.
+    if (pct === 100 && !bookCompletedRef.current) {
+      bookCompletedRef.current = true
+      trackCompletedBook(book.id)
     }
   }, [book.id])
 
@@ -283,8 +293,9 @@ export default function StandardEbooksReader({ book, onBack }) {
     saveLastBook(book.id)
     setReadPercent(loadProgress(book.id))
     lastSavedPctRef.current = loadProgress(book.id)
-    // Reset completion guard for the new book
+    // Reset completion guard and bookmark threshold for the new book
     bookCompletedRef.current = false
+    lastSavedScrollTopRef.current = null
   }, [book.id])
 
   // Attach scroll listener to track reading progress percentage.
@@ -335,7 +346,7 @@ export default function StandardEbooksReader({ book, onBack }) {
         <button
           onClick={onBack}
           className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-200 active:scale-95 transition-all"
-          aria-label="Back to bookshelf"
+          aria-label={backLabel}
         >
           ← Back
         </button>

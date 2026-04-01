@@ -149,44 +149,74 @@ describe('StandardEbooksReader bookmark system', () => {
   })
 
   test('saves littick_progress_ to localStorage when scroll position changes', async () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
-
-    // Mock scrollable container geometry so computeAndSyncProgress detects a non-zero %
-    const mockValues = { scrollTop: 150, scrollHeight: 600, clientHeight: 300 }
-    const originalDescriptors = {}
-    for (const prop of Object.keys(mockValues)) {
-      originalDescriptors[prop] = Object.getOwnPropertyDescriptor(Element.prototype, prop)
-      Object.defineProperty(Element.prototype, prop, {
-        get() { return mockValues[prop] },
-        set(v) { mockValues.scrollTop = v },
-        configurable: true,
-      })
+    // Stub requestAnimationFrame with a counter+map so multiple concurrent schedule
+    // calls are tracked correctly (matches browser API contract)
+    let rafIdCounter = 0
+    const pendingRafs = new Map()
+    const originalRaf = global.requestAnimationFrame
+    const originalCaf = global.cancelAnimationFrame
+    global.requestAnimationFrame = (cb) => {
+      const id = ++rafIdCounter
+      pendingRafs.set(id, cb)
+      return id
     }
+    global.cancelAnimationFrame = (id) => { pendingRafs.delete(id) }
+
+    // Helper to flush all pending rAF callbacks
+    const flushRafs = () => {
+      const cbs = [...pendingRafs.values()]
+      pendingRafs.clear()
+      cbs.forEach(cb => cb())
+    }
+
+    // Start geometry at 0 so initial sync computes 0% — no new saveProgress write
+    let scrollTopVal = 0
+    const originalDescs = {}
+    for (const prop of ['scrollTop', 'scrollHeight', 'clientHeight']) {
+      originalDescs[prop] = Object.getOwnPropertyDescriptor(Element.prototype, prop)
+    }
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      get() { return scrollTopVal },
+      set(v) { scrollTopVal = v },
+      configurable: true,
+    })
+    Object.defineProperty(Element.prototype, 'scrollHeight', { get() { return 600 }, configurable: true })
+    Object.defineProperty(Element.prototype, 'clientHeight', { get() { return 300 }, configurable: true })
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
 
     try {
       render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
       await waitFor(() => screen.getByTestId('reading-container'))
 
-      const container = screen.getByTestId('reading-container')
+      // Flush any pending rAF from post-mount effects
+      act(() => { flushRafs() })
 
-      await act(async () => {
-        fireEvent.scroll(container)
-        // Allow the rAF callback to flush in jsdom
-        await new Promise(r => setTimeout(r, 50))
+      // Record progress writes before the scroll
+      const callsBefore = setItemSpy.mock.calls.filter(
+        ([key]) => key === `littick_progress_${TEST_BOOK.id}`
+      ).length
+
+      // Simulate scrolling to 50%: 150px into a 300px scrollable area
+      scrollTopVal = 150
+      act(() => {
+        fireEvent.scroll(screen.getByTestId('reading-container'))
+        flushRafs() // flush the rAF callback registered by the scroll handler
       })
 
-      const progressCall = setItemSpy.mock.calls.find(
+      const progressCalls = setItemSpy.mock.calls.filter(
         ([key]) => key === `littick_progress_${TEST_BOOK.id}`
       )
-      expect(progressCall).toBeDefined()
-      expect(Number.isFinite(parseInt(progressCall[1], 10))).toBe(true)
+      expect(progressCalls.length).toBeGreaterThan(callsBefore)
+      const lastCall = progressCalls[progressCalls.length - 1]
+      expect(parseInt(lastCall[1], 10)).toBe(50) // 150/(600-300)*100 = 50%
     } finally {
-      for (const prop of Object.keys(mockValues)) {
-        if (originalDescriptors[prop]) {
-          Object.defineProperty(Element.prototype, prop, originalDescriptors[prop])
-        }
+      for (const prop of Object.keys(originalDescs)) {
+        if (originalDescs[prop]) Object.defineProperty(Element.prototype, prop, originalDescs[prop])
       }
       setItemSpy.mockRestore()
+      global.requestAnimationFrame = originalRaf
+      global.cancelAnimationFrame = originalCaf
     }
   })
 })
