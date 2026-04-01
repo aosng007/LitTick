@@ -44,6 +44,62 @@ function saveBookmark(bookId, scrollPos) {
   } catch { /* localStorage unavailable – storage restriction */ }
 }
 
+function loadProgress(bookId) {
+  try {
+    const raw = localStorage.getItem(`littick_progress_${bookId}`)
+    if (raw === null) return 0
+    const n = parseFloat(raw)
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveProgress(bookId, percent) {
+  try {
+    localStorage.setItem(`littick_progress_${bookId}`, String(Math.round(percent)))
+  } catch { /* localStorage unavailable */ }
+}
+
+function saveLastBook(bookId) {
+  try {
+    localStorage.setItem('littick_last_book', bookId)
+  } catch { /* localStorage unavailable */ }
+}
+
+// ---------------------------------------------------------------------------
+// Helper – award a badge (shared pattern from Timer.jsx)
+// ---------------------------------------------------------------------------
+const BADGES_KEY = 'littick_user_badges'
+function awardBadge(badgeId) {
+  try {
+    const raw = localStorage.getItem(BADGES_KEY)
+    const parsed = JSON.parse(raw || '[]')
+    const badges = Array.isArray(parsed) ? parsed : []
+    if (!badges.includes(badgeId)) {
+      localStorage.setItem(BADGES_KEY, JSON.stringify([...badges, badgeId]))
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
+// ---------------------------------------------------------------------------
+// Helper – track completed classic books and award Bookworm badge after 3
+// ---------------------------------------------------------------------------
+function trackCompletedBook(bookId) {
+  try {
+    const raw = localStorage.getItem('littick_completed_books')
+    const parsed = JSON.parse(raw || '[]')
+    const books = Array.isArray(parsed) ? parsed : []
+    if (!books.includes(bookId)) {
+      const updated = [...books, bookId]
+      localStorage.setItem('littick_completed_books', JSON.stringify(updated))
+      if (updated.length >= 3) {
+        awardBadge('bookworm')
+      }
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
 // ---------------------------------------------------------------------------
 // Sanitize fetched HTML before injection
 // Removes <script> tags, inline event handlers (on*), and javascript: URLs.
@@ -131,7 +187,7 @@ function sanitizeHtml(html, baseUrl) {
 // ---------------------------------------------------------------------------
 // Main StandardEbooksReader component
 // ---------------------------------------------------------------------------
-export default function StandardEbooksReader({ book, onBack }) {
+export default function StandardEbooksReader({ book, onBack, backLabel = 'Back to bookshelf' }) {
   const containerRef = useRef(null)
 
   const [htmlContent, setHtmlContent] = useState('')
@@ -139,6 +195,13 @@ export default function StandardEbooksReader({ book, onBack }) {
   const [error, setError] = useState(null)
   const [bookmarkSaved, setBookmarkSaved] = useState(false)
   const [activeWord, setActiveWord] = useState(null)
+  const [readPercent, setReadPercent] = useState(() => loadProgress(book.id))
+  // Track previous persisted % to avoid redundant localStorage writes on every scroll tick
+  const lastSavedPctRef = useRef(loadProgress(book.id))
+  // Guard to ensure trackCompletedBook is called at most once per book per session
+  const bookCompletedRef = useRef(false)
+  // Track last saved scroll pixel position; only write when it changes by > threshold
+  const lastSavedScrollTopRef = useRef(null)
 
   // Construct the single-page URL from the book's canonical Standard Ebooks URL
   const singlePageUrl = `${book.url}/text/single-page`
@@ -183,15 +246,87 @@ export default function StandardEbooksReader({ book, onBack }) {
     return () => { controller.abort() }
   }, [singlePageUrl])
 
-  // Restore saved scroll position after content is injected
+  // Helper to compute % from the container's current scroll position
+  const computeAndSyncProgress = useCallback(() => {
+    const container = containerRef.current
+    if (!container) return
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const scrollable = scrollHeight - clientHeight
+    const pct = scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
+    setReadPercent(pct)
+    // Save bookmark pixel position when scroll changes by more than a small threshold
+    // (20px), avoiding excessive writes while still restoring close to last position.
+    const BOOKMARK_THRESHOLD_PX = 20
+    if (lastSavedScrollTopRef.current === null || Math.abs(scrollTop - lastSavedScrollTopRef.current) >= BOOKMARK_THRESHOLD_PX) {
+      lastSavedScrollTopRef.current = scrollTop
+      saveBookmark(book.id, String(scrollTop))
+    }
+    // Only persist % when it actually changes to avoid redundant localStorage writes.
+    if (pct !== lastSavedPctRef.current) {
+      lastSavedPctRef.current = pct
+      saveProgress(book.id, pct)
+    }
+    // Check completion outside the % change guard so a book already at 100%
+    // (e.g., pre-seeded progress) is still recorded in littick_completed_books.
+    if (pct === 100 && !bookCompletedRef.current) {
+      bookCompletedRef.current = true
+      trackCompletedBook(book.id)
+    }
+  }, [book.id])
+
+  // Restore saved scroll position after content is injected, then sync readPercent
   useEffect(() => {
     if (!htmlContent || !containerRef.current) return
     const saved = loadBookmark(book.id)
     if (saved) {
       const pos = parseInt(saved, 10)
-      if (!Number.isNaN(pos) && pos >= 0) containerRef.current.scrollTop = pos
+      if (!Number.isNaN(pos) && pos >= 0) {
+        containerRef.current.scrollTop = pos
+      }
     }
-  }, [htmlContent, book.id])
+    // Sync readPercent from actual scroll position after restore
+    computeAndSyncProgress()
+  }, [htmlContent, book.id, computeAndSyncProgress])
+
+  // Record this book as the most recently read classic
+  useEffect(() => {
+    saveLastBook(book.id)
+    setReadPercent(loadProgress(book.id))
+    lastSavedPctRef.current = loadProgress(book.id)
+    // Reset completion guard and bookmark threshold for the new book
+    bookCompletedRef.current = false
+    lastSavedScrollTopRef.current = null
+  }, [book.id])
+
+  // Attach scroll listener to track reading progress percentage.
+  // UI is updated every rAF; localStorage is only written when the rounded % changes
+  // to avoid synchronous storage writes on every scroll tick (which can cause jank).
+    const updateProgressFromScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      const scrollable = scrollHeight - clientHeight
+      const pct =
+        scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
+      setReadPercent(pct)
+      saveProgress(book.id, pct)
+    }
+
+    let rafId = null
+    const handleScroll = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        updateProgressFromScroll()
+      })
+    }
+
+    // Sync initial readPercent with the actual scroll position after content load
+    updateProgressFromScroll()
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [htmlContent, computeAndSyncProgress])
 
   // Attach onerror handlers to every <img> so that images that still fail to
   // load (e.g. due to CORS or an unresolvable path) are hidden rather than
@@ -218,7 +353,7 @@ export default function StandardEbooksReader({ book, onBack }) {
         <button
           onClick={onBack}
           className="flex-shrink-0 flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-2 text-sm font-bold text-amber-700 hover:bg-amber-200 active:scale-95 transition-all"
-          aria-label="Back to bookshelf"
+          aria-label={backLabel}
         >
           ← Back
         </button>
@@ -229,6 +364,23 @@ export default function StandardEbooksReader({ book, onBack }) {
             {book.title}
           </h3>
           <p className="text-xs text-gray-500 truncate">{book.author}</p>
+          {/* Progress bar */}
+          <div className="mt-1 flex items-center gap-1.5">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-koala-green transition-all duration-500"
+                style={{ width: `${readPercent}%` }}
+                role="progressbar"
+                aria-valuenow={readPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${readPercent}% read`}
+              />
+            </div>
+            <span className="text-xs text-gray-400 font-semibold tabular-nums w-8 text-right">
+              {readPercent}%
+            </span>
+          </div>
         </div>
 
         <button

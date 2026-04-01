@@ -1,7 +1,7 @@
 /**
  * DiscoveryHub.jsx
  * Discovery Hub – showcases three content sources:
- *   1. Standard Ebooks Shelf  (5 hardcoded Year 2 classics, rendered via epubjs)
+ *   1. Standard Ebooks Shelf  (8 child-friendly classics, rendered via fetch + dangerouslySetInnerHTML)
  *   2. Daily News             (NewsAPI – requires API key)
  *   3. Nature Explorer        (National Geographic RSS via rss2json, with local fallback)
  *
@@ -15,16 +15,48 @@ import { STANDARD_EBOOKS_CLASSICS } from '../content/StandardEbooksClassics'
 import DictionaryPopover, { getSelectedWord } from './DictionaryPopover'
 
 // ---------------------------------------------------------------------------
-// Standard Ebooks Shelf – displays 5 hardcoded Year 2 classics
+// Standard Ebooks Shelf – displays hardcoded Year 2 classics
 // ---------------------------------------------------------------------------
-function StandardEbooksShelf() {
-  const [selectedBook, setSelectedBook] = useState(null)
+
+/** Read the saved progress percentage for a book (0-100). */
+function loadBookProgress(bookId) {
+  try {
+    const raw = localStorage.getItem(`littick_progress_${bookId}`)
+    if (raw === null) return 0
+    const n = parseFloat(raw)
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0
+  } catch {
+    return 0
+  }
+}
+
+function StandardEbooksShelf({ initialBookId }) {
+  const [selectedBook, setSelectedBook] = useState(() => {
+    if (initialBookId) return STANDARD_EBOOKS_CLASSICS.find(b => b.id === initialBookId) || null
+    return null
+  })
+  const [progressMap, setProgressMap] = useState({})
+
+  // Load saved progress for every book on mount
+  useEffect(() => {
+    const map = {}
+    STANDARD_EBOOKS_CLASSICS.forEach(book => {
+      map[book.id] = loadBookProgress(book.id)
+    })
+    setProgressMap(map)
+  }, [])
 
   if (selectedBook) {
     return (
       <StandardEbooksReader
         book={selectedBook}
-        onBack={() => setSelectedBook(null)}
+        onBack={() => {
+          // Refresh progress when returning to the shelf
+          const map = {}
+          STANDARD_EBOOKS_CLASSICS.forEach(book => { map[book.id] = loadBookProgress(book.id) })
+          setProgressMap(map)
+          setSelectedBook(null)
+        }}
       />
     )
   }
@@ -37,28 +69,53 @@ function StandardEbooksShelf() {
         <span className="text-xs text-gray-400 ml-auto">Standard Ebooks</span>
       </div>
       <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {STANDARD_EBOOKS_CLASSICS.map(book => (
-          <li key={book.id}>
-            <button
-              onClick={() => setSelectedBook(book)}
-              className="w-full flex flex-col items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm hover:bg-amber-100 hover:border-amber-400 hover:shadow-md active:scale-[0.98] transition-all text-center"
-              aria-label={`Read ${book.title}`}
-            >
-              <span
-                className="text-4xl w-16 h-[88px] flex items-center justify-center rounded shadow"
-                style={{ background: book.coverColor + '33' }}
-                aria-hidden="true"
+        {STANDARD_EBOOKS_CLASSICS.map(book => {
+          const pct = progressMap[book.id] || 0
+          return (
+            <li key={book.id}>
+              <button
+                onClick={() => setSelectedBook(book)}
+                className="w-full flex flex-col items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 p-2 text-sm hover:bg-amber-100 hover:border-amber-400 hover:shadow-md active:scale-[0.98] transition-all text-center"
+                aria-label={`Read ${book.title}${pct > 0 ? ` – ${pct}% read` : ''}`}
               >
-                {book.emoji}
-              </span>
-              <p className="font-bold text-gray-800 line-clamp-2 text-xs leading-snug">
-                {book.title}
-              </p>
-              <p className="text-xs text-gray-500 truncate w-full">{book.author}</p>
-              <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">▶ Read</p>
-            </button>
-          </li>
-        ))}
+                <span
+                  className="relative text-4xl w-16 h-[88px] flex items-center justify-center rounded shadow"
+                  style={{ background: book.coverColor + '33' }}
+                  aria-hidden="true"
+                >
+                  {book.emoji}
+                  {pct > 0 && (
+                    <span className="absolute top-1 right-1 text-[10px] font-bold bg-koala-green text-white rounded-full px-1 leading-4">
+                      {pct}%
+                    </span>
+                  )}
+                </span>
+                <p className="font-bold text-gray-800 line-clamp-2 text-xs leading-snug">
+                  {book.title}
+                </p>
+                <p className="text-xs text-gray-500 truncate w-full">{book.author}</p>
+                {/* Per-book progress bar */}
+                {pct > 0 && (
+                  <div className="w-full h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-koala-green"
+                      style={{ width: `${pct}%` }}
+                      role="progressbar"
+                      aria-valuenow={pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${book.title} reading progress`}
+                      aria-label={`${book.title} reading progress: ${pct}%`}
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">
+                  {pct > 0 ? '▶ Open' : '▶ Read'}
+                </p>
+              </button>
+            </li>
+          )
+        })}
       </ul>
     </div>
   )
@@ -398,7 +455,7 @@ function NatureExplorer() {
 // ---------------------------------------------------------------------------
 // Discovery Hub – main export
 // ---------------------------------------------------------------------------
-export default function DiscoveryHub({ storyTheme = 'children' }) {
+export default function DiscoveryHub({ storyTheme = 'children', initialBookId }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="text-center">
@@ -413,7 +470,7 @@ export default function DiscoveryHub({ storyTheme = 'children' }) {
       <div className="grid grid-cols-1 gap-5">
         {/* Standard Ebooks Classic Bookshelf */}
         <div className="rounded-3xl bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 p-4 shadow-sm">
-          <StandardEbooksShelf />
+          <StandardEbooksShelf initialBookId={initialBookId} />
         </div>
 
         {/* Daily News */}

@@ -10,7 +10,9 @@ import PuzzleGame from './components/PuzzleGame'
 import Achievements from './components/Achievements'
 import DiscoveryHub from './components/DiscoveryHub'
 import DictionaryPopover from './components/DictionaryPopover'
+import StandardEbooksReader from './components/StandardEbooksReader'
 import stories from './content/Year2Texts.json'
+import { STANDARD_EBOOKS_CLASSICS } from './content/StandardEbooksClassics'
 
 // ---------------------------------------------------------------------------
 // One-time migration: move legacy koalaread-* keys to littick_* equivalents
@@ -40,6 +42,26 @@ function migrateStorageKeys() {
 migrateStorageKeys()
 
 // ---------------------------------------------------------------------------
+// Helper – award a badge (used across the app for badges not triggered by Timer.jsx)
+// ---------------------------------------------------------------------------
+function awardBadge(badgeId) {
+  try {
+    const raw = localStorage.getItem('littick_user_badges')
+    const parsed = JSON.parse(raw || '[]')
+    const badges = Array.isArray(parsed) ? parsed : []
+    if (!badges.includes(badgeId)) {
+      localStorage.setItem('littick_user_badges', JSON.stringify([...badges, badgeId]))
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
+// Award Early Bird badge on app load if current hour is before 8 AM.
+// Called once at module level so it fires even before any component mounts.
+if (new Date().getHours() < 8) {
+  awardBadge('early_bird')
+}
+
+// ---------------------------------------------------------------------------
 // Helper – safely parse the unlocked-stories array from localStorage
 // ---------------------------------------------------------------------------
 function safeParseUnlocked() {
@@ -49,6 +71,23 @@ function safeParseUnlocked() {
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper – read the last classic book opened and its saved progress
+// ---------------------------------------------------------------------------
+function loadLastReadBook() {
+  try {
+    const bookId = localStorage.getItem('littick_last_book')
+    if (!bookId) return null
+    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === bookId)
+    if (!book) return null
+    const raw = localStorage.getItem(`littick_progress_${bookId}`)
+    const pct = raw !== null ? Math.min(100, Math.max(0, parseFloat(raw) || 0)) : 0
+    return { book, pct }
+  } catch {
+    return null
   }
 }
 
@@ -324,6 +363,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('read')
   const [puzzleUnlocked, setPuzzleUnlocked] = useState(false)
   const [showAchievements, setShowAchievements] = useState(false)
+  const [resumeBook, setResumeBook] = useState(null)
   // Track which tabs have been visited so we lazy-mount their content.
   // 'read' is always pre-activated (it is the default landing tab).
   const [activatedTabs, setActivatedTabs] = useState(() => new Set(['read']))
@@ -410,8 +450,35 @@ export default function App() {
     return <Achievements onBack={() => setShowAchievements(false)} />
   }
 
+  // ── Resume classic book screen ────────────────────────────────────────────
+  if (resumeBook) {
+    return (
+      <div className="min-h-screen flex flex-col items-center px-3 py-4 sm:px-6 sm:py-6">
+        <div className="w-full max-w-2xl">
+          <StandardEbooksReader book={resumeBook} onBack={() => setResumeBook(null)} backLabel="Back to story selection" />
+        </div>
+
+        {/* Fixed timer overlay – scaled down on mobile */}
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg scale-[0.6] sm:scale-100 origin-top-right">
+          <Timer onTimerComplete={handleTimerComplete} />
+        </div>
+
+        {/* Achievements button – fixed at top-left */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="fixed top-2.5 left-2.5 z-[10000] flex items-center gap-1.5 rounded-2xl bg-yellow-400/90 px-3 py-2 text-sm font-bold text-yellow-900 shadow-lg hover:bg-yellow-400 active:scale-[0.57] sm:active:scale-95 transition-all scale-[0.6] sm:scale-100 origin-top-left"
+          aria-label="View my achievements"
+        >
+          🏆 <span className="hidden sm:inline">My Achievements</span>
+        </button>
+      </div>
+    )
+  }
+
   // ── Story selection screen ────────────────────────────────────────────────
   if (!selectedStory) {
+    const lastRead = loadLastReadBook()
+
     return (
       <div className="min-h-screen flex flex-col items-center px-4 py-8">
         {/* Header */}
@@ -425,21 +492,46 @@ export default function App() {
           </p>
         </div>
 
+        {/* Resume last-read classic – shown only if a book was previously opened */}
+        {lastRead && (
+          <div className="w-full max-w-2xl mb-5">
+            <div className="flex items-center gap-3 rounded-2xl bg-white/80 border border-koala-green/30 shadow-md px-4 py-3">
+              <span className="text-3xl flex-shrink-0" aria-hidden="true">{lastRead.book.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Last Read</p>
+                <p className="font-extrabold text-gray-800 text-sm leading-snug line-clamp-1">{lastRead.book.title}</p>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-koala-green"
+                      style={{ width: `${lastRead.pct}%` }}
+                      role="progressbar"
+                      aria-valuenow={lastRead.pct}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${lastRead.book.title} reading progress: ${lastRead.pct}%`}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 font-semibold tabular-nums w-8 text-right">{lastRead.pct}%</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setResumeBook(lastRead.book)}
+                className="flex-shrink-0 rounded-xl bg-koala-green px-4 py-2 text-sm font-bold text-white shadow hover:bg-koala-teal active:scale-95 transition-all"
+                aria-label={`Resume reading ${lastRead.book.title} from where you left off`}
+              >
+                ▶ Resume
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Story grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full max-w-2xl">
           {stories.map(story => (
             <StoryCard key={story.id} story={story} onSelect={handleSelectStory} />
           ))}
         </div>
-
-        {/* Achievements link */}
-        <button
-          onClick={() => setShowAchievements(true)}
-          className="mt-6 flex items-center gap-2 rounded-2xl bg-yellow-400/80 px-5 py-2.5 font-bold text-yellow-900 shadow hover:bg-yellow-400 active:scale-95 transition-all"
-          aria-label="View my achievements"
-        >
-          🏆 My Achievements
-        </button>
 
         <p className="mt-4 text-xs text-gray-400 text-center max-w-xs">
           Pick a story to start reading! ⭐ All stories are curriculum-aligned for Year 2 students.
@@ -453,9 +545,18 @@ export default function App() {
         )}
 
         {/* Global timer overlay – fixed at top-right so it persists across all screens */}
-        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg">
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg scale-[0.6] sm:scale-100 origin-top-right">
           <Timer onTimerComplete={handleTimerComplete} />
         </div>
+
+        {/* Achievements button – fixed at top-left */}
+        <button
+          onClick={() => setShowAchievements(true)}
+          className="fixed top-2.5 left-2.5 z-[10000] flex items-center gap-1.5 rounded-2xl bg-yellow-400/90 px-3 py-2 text-sm font-bold text-yellow-900 shadow-lg hover:bg-yellow-400 active:scale-[0.57] sm:active:scale-95 transition-all scale-[0.6] sm:scale-100 origin-top-left"
+          aria-label="View my achievements"
+        >
+          🏆 <span className="hidden sm:inline">My Achievements</span>
+        </button>
       </div>
     )
   }
@@ -533,8 +634,8 @@ export default function App() {
 
       {/* Main card */}
       <main className="w-full max-w-2xl flex flex-col gap-4">
-        {/* Fixed timer overlay – always visible above the reading container */}
-        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg">
+        {/* Fixed timer overlay – scaled down on mobile */}
+        <div className="fixed top-2.5 right-2.5 z-[10000] bg-koala-yellow rounded-2xl p-3 shadow-lg scale-[0.6] sm:scale-100 origin-top-right">
           <Timer onTimerComplete={handleTimerComplete} />
         </div>
         {puzzleUnlocked && (

@@ -35,6 +35,33 @@ export function getSelectedWord() {
   return selected && /^[a-zA-Z'-]+$/.test(selected) ? selected : null
 }
 
+// ---------------------------------------------------------------------------
+// Helper – track word lookups and award word_wizard badge after 5 unique lookups
+// ---------------------------------------------------------------------------
+function trackWordLookup(word) {
+  try {
+    const raw = localStorage.getItem('littick_word_lookups')
+    const parsed = JSON.parse(raw || '[]')
+    const words = Array.isArray(parsed) ? parsed : []
+    const lower = word.toLowerCase()
+    if (!words.includes(lower)) {
+      const updated = [...words, lower]
+      localStorage.setItem('littick_word_lookups', JSON.stringify(updated))
+      if (updated.length >= 5) {
+        // Award word_wizard badge
+        try {
+          const badgesRaw = localStorage.getItem('littick_user_badges')
+          const badgesParsed = JSON.parse(badgesRaw || '[]')
+          const badges = Array.isArray(badgesParsed) ? badgesParsed : []
+          if (!badges.includes('word_wizard')) {
+            localStorage.setItem('littick_user_badges', JSON.stringify([...badges, 'word_wizard']))
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  } catch { /* localStorage unavailable */ }
+}
+
 export default function DictionaryPopover({ word, onClose, maxWords }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -62,6 +89,8 @@ export default function DictionaryPopover({ word, onClose, maxWords }) {
         if (canceled || controller.signal.aborted) return
         if (Array.isArray(json) && json.length > 0) {
           setData(json[0])
+          // Track this successful lookup for the word_wizard badge
+          trackWordLookup(clean)
         } else {
           setError('No definition found.')
         }

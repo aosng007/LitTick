@@ -268,6 +268,19 @@ export default function PuzzleGame({ keywords = [], storyTitle = '' }) {
     setAllFound(false)
   }
 
+  // Award puzzle_master badge when all words are found
+  useEffect(() => {
+    if (!allFound) return
+    try {
+      const raw = localStorage.getItem('littick_user_badges')
+      const parsed = JSON.parse(raw || '[]')
+      const badges = Array.isArray(parsed) ? parsed : []
+      if (!badges.includes('puzzle_master')) {
+        localStorage.setItem('littick_user_badges', JSON.stringify([...badges, 'puzzle_master']))
+      }
+    } catch { /* localStorage unavailable */ }
+  }, [allFound])
+
   return (
     <div className="flex flex-col gap-4 select-none">
       {/* Header */}

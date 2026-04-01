@@ -29,6 +29,9 @@ describe('StandardEbooksReader bookmark system', () => {
   afterEach(() => {
     global.fetch = originalFetch
     localStorage.removeItem(BOOKMARK_KEY)
+    localStorage.removeItem(`littick_progress_${TEST_BOOK.id}`)
+    localStorage.removeItem('littick_last_book')
+    localStorage.removeItem('littick_completed_books')
     vi.clearAllMocks()
   })
 
@@ -135,5 +138,85 @@ describe('StandardEbooksReader bookmark system', () => {
     })
 
     expect(screen.getByText(/Saved!/i)).toBeInTheDocument()
+  })
+
+  test('sets littick_last_book in localStorage on mount', async () => {
+    render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+
+    await waitFor(() => screen.getByTestId('reading-container'))
+
+    expect(localStorage.getItem('littick_last_book')).toBe(TEST_BOOK.id)
+  })
+
+  test('saves littick_progress_ to localStorage when scroll position changes', async () => {
+    // Stub requestAnimationFrame with a counter+map so multiple concurrent schedule
+    // calls are tracked correctly (matches browser API contract)
+    let rafIdCounter = 0
+    const pendingRafs = new Map()
+    const originalRaf = global.requestAnimationFrame
+    const originalCaf = global.cancelAnimationFrame
+    global.requestAnimationFrame = (cb) => {
+      const id = ++rafIdCounter
+      pendingRafs.set(id, cb)
+      return id
+    }
+    global.cancelAnimationFrame = (id) => { pendingRafs.delete(id) }
+
+    // Helper to flush all pending rAF callbacks
+    const flushRafs = () => {
+      const cbs = [...pendingRafs.values()]
+      pendingRafs.clear()
+      cbs.forEach(cb => cb())
+    }
+
+    // Start geometry at 0 so initial sync computes 0% — no new saveProgress write
+    let scrollTopVal = 0
+    const originalDescs = {}
+    for (const prop of ['scrollTop', 'scrollHeight', 'clientHeight']) {
+      originalDescs[prop] = Object.getOwnPropertyDescriptor(Element.prototype, prop)
+    }
+    Object.defineProperty(Element.prototype, 'scrollTop', {
+      get() { return scrollTopVal },
+      set(v) { scrollTopVal = v },
+      configurable: true,
+    })
+    Object.defineProperty(Element.prototype, 'scrollHeight', { get() { return 600 }, configurable: true })
+    Object.defineProperty(Element.prototype, 'clientHeight', { get() { return 300 }, configurable: true })
+
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    try {
+      render(<StandardEbooksReader book={TEST_BOOK} onBack={vi.fn()} />)
+      await waitFor(() => screen.getByTestId('reading-container'))
+
+      // Flush any pending rAF from post-mount effects
+      act(() => { flushRafs() })
+
+      // Record progress writes before the scroll
+      const callsBefore = setItemSpy.mock.calls.filter(
+        ([key]) => key === `littick_progress_${TEST_BOOK.id}`
+      ).length
+
+      // Simulate scrolling to 50%: 150px into a 300px scrollable area
+      scrollTopVal = 150
+      act(() => {
+        fireEvent.scroll(screen.getByTestId('reading-container'))
+        flushRafs() // flush the rAF callback registered by the scroll handler
+      })
+
+      const progressCalls = setItemSpy.mock.calls.filter(
+        ([key]) => key === `littick_progress_${TEST_BOOK.id}`
+      )
+      expect(progressCalls.length).toBeGreaterThan(callsBefore)
+      const lastCall = progressCalls[progressCalls.length - 1]
+      expect(parseInt(lastCall[1], 10)).toBe(50) // 150/(600-300)*100 = 50%
+    } finally {
+      for (const prop of Object.keys(originalDescs)) {
+        if (originalDescs[prop]) Object.defineProperty(Element.prototype, prop, originalDescs[prop])
+      }
+      setItemSpy.mockRestore()
+      global.requestAnimationFrame = originalRaf
+      global.cancelAnimationFrame = originalCaf
+    }
   })
 })

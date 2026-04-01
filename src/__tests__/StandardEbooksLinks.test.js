@@ -1,5 +1,5 @@
 // src/__tests__/StandardEbooksLinks.test.js
-// Integration tests: verifies that the 5 hardcoded Standard Ebooks classic book
+// Integration tests: verifies that the hardcoded Standard Ebooks classic book
 // URLs return an HTTP 200 OK status, and that the classics data is correctly shaped.
 //
 // These tests guard against broken / renamed Standard Ebooks URLs sneaking into
@@ -12,8 +12,8 @@ import { STANDARD_EBOOKS_CLASSICS } from '../content/StandardEbooksClassics'
 // Shape / static checks (always run, no network needed)
 // ---------------------------------------------------------------------------
 describe('STANDARD_EBOOKS_CLASSICS data', () => {
-  test('exports exactly 5 books', () => {
-    expect(STANDARD_EBOOKS_CLASSICS).toHaveLength(5)
+  test('exports at least 8 books', () => {
+    expect(STANDARD_EBOOKS_CLASSICS.length).toBeGreaterThanOrEqual(8)
   })
 
   test('every book has the required fields', () => {
@@ -77,6 +77,24 @@ describe('STANDARD_EBOOKS_CLASSICS data', () => {
     const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'wizard-of-oz')
     expect(book).toBeDefined()
     expect(book.url).toContain('standardebooks.org')
+  })
+
+  test('contains The Jungle Book', () => {
+    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'jungle-book')
+    expect(book).toBeDefined()
+    expect(book.url).toBe('https://standardebooks.org/ebooks/rudyard-kipling/the-jungle-book')
+  })
+
+  test('contains Black Beauty', () => {
+    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'black-beauty')
+    expect(book).toBeDefined()
+    expect(book.url).toBe('https://standardebooks.org/ebooks/anna-sewell/black-beauty')
+  })
+
+  test('contains Treasure Island', () => {
+    const book = STANDARD_EBOOKS_CLASSICS.find(b => b.id === 'treasure-island')
+    expect(book).toBeDefined()
+    expect(book.url).toBe('https://standardebooks.org/ebooks/robert-louis-stevenson/treasure-island')
   })
 })
 

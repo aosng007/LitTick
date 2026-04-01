@@ -118,6 +118,19 @@ export default function Checklist({ storyId }) {
   const completedCount = FINGERS.filter(f => checked[f.id]).length
   const allDone = completedCount === FINGERS.length
 
+  // Award retell_hero badge the first time all five fingers are ticked
+  useEffect(() => {
+    if (!allDone) return
+    try {
+      const raw = localStorage.getItem('littick_user_badges')
+      const parsed = JSON.parse(raw || '[]')
+      const badges = Array.isArray(parsed) ? parsed : []
+      if (!badges.includes('retell_hero')) {
+        localStorage.setItem('littick_user_badges', JSON.stringify([...badges, 'retell_hero']))
+      }
+    } catch { /* localStorage unavailable */ }
+  }, [allDone])
+
   const handleClear = () => {
     setChecked({})
     setNotes({})
