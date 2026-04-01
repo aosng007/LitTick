@@ -64,4 +64,34 @@ export const STANDARD_EBOOKS_CLASSICS = [
     epubUrl:
       'https://standardebooks.org/ebooks/l-frank-baum/the-wonderful-wizard-of-oz/downloads/l-frank-baum_the-wonderful-wizard-of-oz.epub',
   },
+  {
+    id: 'jungle-book',
+    title: 'The Jungle Book',
+    author: 'Rudyard Kipling',
+    emoji: '🐯',
+    coverColor: '#65A30D',
+    url: 'https://standardebooks.org/ebooks/rudyard-kipling/the-jungle-book',
+    epubUrl:
+      'https://standardebooks.org/ebooks/rudyard-kipling/the-jungle-book/downloads/rudyard-kipling_the-jungle-book.epub',
+  },
+  {
+    id: 'black-beauty',
+    title: 'Black Beauty',
+    author: 'Anna Sewell',
+    emoji: '🐴',
+    coverColor: '#1C1917',
+    url: 'https://standardebooks.org/ebooks/anna-sewell/black-beauty',
+    epubUrl:
+      'https://standardebooks.org/ebooks/anna-sewell/black-beauty/downloads/anna-sewell_black-beauty.epub',
+  },
+  {
+    id: 'treasure-island',
+    title: 'Treasure Island',
+    author: 'Robert Louis Stevenson',
+    emoji: '🏴‍☠️',
+    coverColor: '#B45309',
+    url: 'https://standardebooks.org/ebooks/robert-louis-stevenson/treasure-island',
+    epubUrl:
+      'https://standardebooks.org/ebooks/robert-louis-stevenson/treasure-island/downloads/robert-louis-stevenson_treasure-island.epub',
+  },
 ]

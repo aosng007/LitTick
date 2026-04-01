@@ -18,6 +18,8 @@ All keys written to `localStorage` **must** use the `littick_` prefix. Using any
 | `littick_checklist_<storyId>` | `JSON string → object` | Five Finger Retell state for a specific story: `{ checked: Record<string,boolean>, notes: Record<string,string> }`. `<storyId>` is replaced by the story ID (e.g. `littick_checklist_koala`). |
 | `littick_user_badges` | `JSON string → string[]` | Array of badge identifiers earned by the user (e.g. `["reading_star","puzzle_master"]`). |
 | `littick_bookmark_<bookId>` | `string` | Scroll position (integer pixels as a string) saved by the "Save Progress" button in the Standard Ebooks reader. `<bookId>` is the book's unique `id` field (e.g. `littick_bookmark_alice-wonderland`). |
+| `littick_progress_<bookId>` | `string` | Reading progress as an integer percentage (0–100) derived from the scroll position in the Standard Ebooks reader. Updated in real-time as the user scrolls. |
+| `littick_last_book` | `string` | ID of the most recently opened Standard Ebooks classic (e.g. `"alice-wonderland"`). Used to populate the "Resume" banner on the home screen. |
 
 ### Rules
 

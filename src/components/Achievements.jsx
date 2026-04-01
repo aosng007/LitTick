@@ -14,6 +14,7 @@ const ALL_BADGES = [
     emoji: '⭐',
     name: 'Reading Star',
     description: 'Completed a full 15-minute reading session!',
+    lockedDescription: 'Start the timer and read for 15 minutes without stopping.',
     colour: 'from-yellow-100 to-yellow-50 border-yellow-300',
   },
   {
@@ -21,13 +22,15 @@ const ALL_BADGES = [
     emoji: '🐦',
     name: 'Early Bird',
     description: 'Started reading first thing in the morning.',
+    lockedDescription: 'Read a story before 8:00 AM.',
     colour: 'from-sky-100 to-sky-50 border-sky-300',
   },
   {
     id: 'word_wizard',
     emoji: '🧙',
     name: 'Word Wizard',
-    description: 'Found all words in the Word Search puzzle.',
+    description: 'Looked up 5 new words to discover their meanings!',
+    lockedDescription: 'Click 5 new words to see their meanings.',
     colour: 'from-purple-100 to-purple-50 border-purple-300',
   },
   {
@@ -35,6 +38,7 @@ const ALL_BADGES = [
     emoji: '🔍',
     name: 'Puzzle Master',
     description: 'Solved three Word Search puzzles.',
+    lockedDescription: 'Find all the hidden words in the Word Search puzzle.',
     colour: 'from-green-100 to-green-50 border-green-300',
   },
   {
@@ -42,13 +46,15 @@ const ALL_BADGES = [
     emoji: '🖐',
     name: 'Retell Hero',
     description: 'Completed the Five Finger Retell for a story.',
+    lockedDescription: 'Fill in all five fingers of the Retell checklist for a story.',
     colour: 'from-pink-100 to-pink-50 border-pink-300',
   },
   {
     id: 'bookworm',
     emoji: '📚',
     name: 'Bookworm',
-    description: 'Read three different stories.',
+    description: 'Finished 3 different stories from the Classic Bookshelf!',
+    lockedDescription: 'Finish 3 different stories from the Classic Bookshelf.',
     colour: 'from-orange-100 to-orange-50 border-orange-300',
   },
 ]
@@ -83,7 +89,7 @@ function BadgeCard({ badge, earned }) {
         {badge.name}
       </p>
       <p className="text-xs text-gray-500 leading-snug">
-        {earned ? badge.description : 'Keep reading to unlock!'}
+        {earned ? badge.description : (badge.lockedDescription || 'Keep reading to unlock!')}
       </p>
       {earned && (
         <span className="mt-1 rounded-full bg-koala-green/20 px-2 py-0.5 text-xs font-bold text-koala-teal">

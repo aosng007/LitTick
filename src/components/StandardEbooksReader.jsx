@@ -44,6 +44,29 @@ function saveBookmark(bookId, scrollPos) {
   } catch { /* localStorage unavailable – storage restriction */ }
 }
 
+function loadProgress(bookId) {
+  try {
+    const raw = localStorage.getItem(`littick_progress_${bookId}`)
+    if (raw === null) return 0
+    const n = parseFloat(raw)
+    return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0
+  } catch {
+    return 0
+  }
+}
+
+function saveProgress(bookId, percent) {
+  try {
+    localStorage.setItem(`littick_progress_${bookId}`, String(Math.round(percent)))
+  } catch { /* localStorage unavailable */ }
+}
+
+function saveLastBook(bookId) {
+  try {
+    localStorage.setItem('littick_last_book', bookId)
+  } catch { /* localStorage unavailable */ }
+}
+
 // ---------------------------------------------------------------------------
 // Sanitize fetched HTML before injection
 // Removes <script> tags, inline event handlers (on*), and javascript: URLs.
@@ -139,6 +162,7 @@ export default function StandardEbooksReader({ book, onBack }) {
   const [error, setError] = useState(null)
   const [bookmarkSaved, setBookmarkSaved] = useState(false)
   const [activeWord, setActiveWord] = useState(null)
+  const [readPercent, setReadPercent] = useState(() => loadProgress(book.id))
 
   // Construct the single-page URL from the book's canonical Standard Ebooks URL
   const singlePageUrl = `${book.url}/text/single-page`
@@ -193,6 +217,37 @@ export default function StandardEbooksReader({ book, onBack }) {
     }
   }, [htmlContent, book.id])
 
+  // Record this book as the most recently read classic
+  useEffect(() => {
+    saveLastBook(book.id)
+    setReadPercent(loadProgress(book.id))
+  }, [book.id])
+
+  // Attach scroll listener to track reading progress percentage
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !htmlContent) return
+
+    let rafId = null
+    const handleScroll = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        const { scrollTop, scrollHeight, clientHeight } = container
+        const scrollable = scrollHeight - clientHeight
+        const pct = scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
+        setReadPercent(pct)
+        saveProgress(book.id, pct)
+      })
+    }
+
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (rafId) cancelAnimationFrame(rafId)
+    }
+  }, [htmlContent, book.id])
+
   // Attach onerror handlers to every <img> so that images that still fail to
   // load (e.g. due to CORS or an unresolvable path) are hidden rather than
   // showing the browser's broken-image icon.
@@ -229,6 +284,23 @@ export default function StandardEbooksReader({ book, onBack }) {
             {book.title}
           </h3>
           <p className="text-xs text-gray-500 truncate">{book.author}</p>
+          {/* Progress bar */}
+          <div className="mt-1 flex items-center gap-1.5">
+            <div className="flex-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-koala-green transition-all duration-500"
+                style={{ width: `${readPercent}%` }}
+                role="progressbar"
+                aria-valuenow={readPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${readPercent}% read`}
+              />
+            </div>
+            <span className="text-xs text-gray-400 font-semibold tabular-nums w-8 text-right">
+              {readPercent}%
+            </span>
+          </div>
         </div>
 
         <button
