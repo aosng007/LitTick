@@ -304,26 +304,18 @@ export default function StandardEbooksReader({ book, onBack, backLabel = 'Back t
   useEffect(() => {
     if (!htmlContent || !containerRef.current) return
     const container = containerRef.current
-    const updateProgressFromScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = container
-      const scrollable = scrollHeight - clientHeight
-      const pct =
-        scrollable > 0 ? Math.min(100, Math.round((scrollTop / scrollable) * 100)) : 0
-      setReadPercent(pct)
-      saveProgress(book.id, pct)
-    }
 
     let rafId = null
     const handleScroll = () => {
       if (rafId) return
       rafId = requestAnimationFrame(() => {
         rafId = null
-        updateProgressFromScroll()
+        computeAndSyncProgress()
       })
     }
 
     // Sync initial readPercent with the actual scroll position after content load
-    updateProgressFromScroll()
+    computeAndSyncProgress()
     container.addEventListener('scroll', handleScroll, { passive: true })
     return () => {
       container.removeEventListener('scroll', handleScroll)
