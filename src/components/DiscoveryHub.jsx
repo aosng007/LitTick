@@ -110,7 +110,7 @@ function StandardEbooksShelf({ initialBookId }) {
                   </div>
                 )}
                 <p className="text-xs text-koala-teal font-semibold" aria-hidden="true">
-                  {pct > 0 ? '▶ Resume' : '▶ Read'}
+                  {pct > 0 ? '▶ Open' : '▶ Read'}
                 </p>
               </button>
             </li>
